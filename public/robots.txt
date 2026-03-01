@@ -1,0 +1,14 @@
+User-agent: *
+Allow: /
+
+# Do not index authenticated / admin routes
+Disallow: /admin
+Disallow: /setup
+Disallow: /dashboard
+Disallow: /namasmarana
+Disallow: /book-club
+Disallow: /games
+Disallow: /journal
+Disallow: /profile
+
+Sitemap: https://sms.ssiomya.org/sitemap.xml
