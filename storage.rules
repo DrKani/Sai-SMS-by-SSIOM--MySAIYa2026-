@@ -1,0 +1,21 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Deny all by default
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+
+    // User specific storage (e.g. avatars)
+    match /users/{userId}/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Book Club Assets - Public Read
+    match /book-club-assets/{allPaths=**} {
+      allow read: if true;
+      allow write: if false; // Admin only in future
+    }
+  }
+}

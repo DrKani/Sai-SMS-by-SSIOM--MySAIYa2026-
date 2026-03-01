@@ -1,0 +1,7 @@
+{
+  "name": "Sai Sadhana Made Simple (Sai SMS) by SSIOM",
+  "description": "A digital hub to empower members of SSIOM in an enriching Spiritual practice experience with tools for sadhana tracking, collective study, and unified spiritual practice.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

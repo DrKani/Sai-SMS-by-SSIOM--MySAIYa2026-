@@ -1,0 +1,21 @@
+{
+    "name": "Sai SMS by SSIOM",
+    "short_name": "Sai SMS",
+    "description": "A digital spiritual hub for SSIOM Malaysia members.",
+    "start_url": "/?source=pwa",
+    "display": "standalone",
+    "background_color": "#FDFBF7",
+    "theme_color": "#002E5B",
+    "icons": [
+        {
+            "src": "/assets/logo.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "/assets/logo.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ]
+}
