@@ -13,7 +13,7 @@ import {
    Save, UserPlus, GraduationCap, Info, Gamepad2, Layers, BarChart2,
    ListFilter, Target, History, Lightbulb, ExternalLink, Video,
    ArrowRight, PenTool, HelpCircle, MessageSquare, Repeat, Smartphone, Sparkles, Megaphone,
-   Trophy, Type, Home, Mic, UserCog, Ban, Key, Map as MapIcon, Quote, Send as SendIcon, MapPin
+   Trophy, Type, Home, Mic, UserCog, Ban, Key, Map as MapIcon, Quote, Send as SendIcon, MapPin, Tag, Newspaper, Globe as GlobeIcon, BookMarked
 } from 'lucide-react';
 import {
    ANNUAL_STUDY_PLAN,
@@ -31,14 +31,16 @@ import {
    BookClubQuizQuestion,
    SmsEvent,
    BrandingConfig,
-   SiteContent
+   SiteContent,
+   Article,
+   ArticleComment
 } from '../types';
 import SaiAvatar from '../components/SaiAvatar';
 import {
    BarChart as ReBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
    PieChart as RePieChart, Pie, Sector, LineChart, Line, Legend, RadialBarChart, RadialBar
 } from 'recharts';
-import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc, addDoc, serverTimestamp, query, orderBy, onSnapshot, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc, addDoc, serverTimestamp, query, orderBy, onSnapshot, Timestamp, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import Papa from 'papaparse';
 
@@ -400,9 +402,24 @@ const UserRegistry = ({ adminEmail }: { adminEmail: string }) => {
    );
 };
 
-// 8. REFLECTION QUEUE MANAGEMENT
+// 8. REFLECTION QUEUE MANAGEMENT (enhanced)
 const ReflectionQueue = ({ adminEmail }: { adminEmail: string }) => {
    const [reflections, setReflections] = useState<Reflection[]>([]);
+   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
+   const [searchQuery, setSearchQuery] = useState('');
+   const [adminComment, setAdminComment] = useState<Record<string, string>>({});
+   const [expandedId, setExpandedId] = useState<string | null>(null);
+
+   const loadQueue = () => {
+      const queue: Reflection[] = JSON.parse(localStorage.getItem('sms_reflections_queue') || '[]');
+      // Sort pending first, then by timestamp desc
+      queue.sort((a, b) => {
+         if (a.status === 'pending' && b.status !== 'pending') return -1;
+         if (b.status === 'pending' && a.status !== 'pending') return 1;
+         return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+      });
+      setReflections(queue);
+   };
 
    useEffect(() => {
       const loadReflections = async () => {
@@ -436,60 +453,166 @@ const ReflectionQueue = ({ adminEmail }: { adminEmail: string }) => {
       }
    };
 
+   const saveAdminComment = (id: string) => {
+      const comment = adminComment[id] || '';
+      const updated = reflections.map(r =>
+         r.id === id ? { ...r, adminComments: comment } : r
+      );
+      setReflections(updated);
+      localStorage.setItem('sms_reflections_queue', JSON.stringify(updated));
+      logAdminAction(adminEmail, 'Added Admin Comment', id);
+      setExpandedId(null);
+   };
+
+   const counts = {
+      all: reflections.length,
+      pending: reflections.filter(r => r.status === 'pending').length,
+      approved: reflections.filter(r => r.status === 'approved').length,
+      rejected: reflections.filter(r => r.status === 'rejected').length,
+   };
+
+   const filtered = reflections.filter(r => {
+      const matchesStatus = statusFilter === 'all' || r.status === statusFilter;
+      const q = searchQuery.toLowerCase();
+      const matchesSearch = !searchQuery || r.userName.toLowerCase().includes(q) ||
+         r.content.toLowerCase().includes(q) || r.chapterTitle.toLowerCase().includes(q);
+      return matchesStatus && matchesSearch;
+   });
+
+   const statusColor = (s: string) => s === 'approved' ? 'bg-green-100 text-green-700' :
+      s === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-gold-100 text-gold-700';
+
    return (
       <div className="space-y-8 animate-in fade-in">
          <div className="flex justify-between items-end">
             <div>
                <h2 className="text-3xl font-serif font-bold text-navy-900">Reflection Queue</h2>
-               <p className="text-sm text-navy-400">Moderate and approve user testimonials.</p>
+               <p className="text-sm text-navy-400">Moderate and approve user testimonials from Book Club.</p>
             </div>
+            <button onClick={loadQueue} className="flex items-center gap-2 px-4 py-2 bg-neutral-100 text-navy-600 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-neutral-200 transition-colors">
+               <RefreshCw size={14} /> Refresh
+            </button>
          </div>
 
-         <Card>
-            <div className="overflow-x-auto">
-               <table className="w-full text-left">
-                  <thead className="bg-neutral-50 text-[10px] font-black uppercase tracking-widest text-navy-400">
-                     <tr>
-                        <th className="p-6">User</th>
-                        <th className="p-6">Content</th>
-                        <th className="p-6">Status</th>
-                        <th className="p-6 text-right">Actions</th>
-                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-navy-50">
-                     {reflections.length === 0 ? (
-                        <tr>
-                           <td colSpan={4} className="p-12 text-center text-navy-300 italic">No pending reflections.</td>
-                        </tr>
-                     ) : reflections.map(r => (
-                        <tr key={r.id} className={`transition-colors ${r.status === 'pending' ? 'bg-white' : 'bg-neutral-50/50 opacity-60'}`}>
-                           <td className="p-6 align-top w-48">
-                              <p className="font-bold text-navy-900 text-sm">{r.userName}</p>
-                              <p className="text-[10px] text-navy-400">{r.timestamp && typeof r.timestamp === 'string' ? new Date(r.timestamp).toLocaleDateString() : 'Recent'}</p>
-                              <p className="text-[9px] font-black uppercase text-purple-600 mt-1">{r.chapterTitle}</p>
-                           </td>
-                           <td className="p-6 align-top">
-                              <p className="text-sm text-navy-600 italic leading-relaxed">"{r.content}"</p>
-                           </td>
-                           <td className="p-6 align-top">
-                              <span className={`px-2 py-1 rounded text-[9px] font-black uppercase tracking-widest ${r.status === 'approved' ? 'bg-green-100 text-green-700' :
-                                 r.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-gold-100 text-gold-700'
-                                 }`}>{r.status}</span>
-                           </td>
-                           <td className="p-6 align-top text-right">
-                              {r.status === 'pending' && (
-                                 <div className="flex justify-end gap-2">
-                                    <button onClick={() => updateStatus(r.id, 'approved')} className="p-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-100"><Check size={16} /></button>
-                                    <button onClick={() => updateStatus(r.id, 'rejected')} className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100"><X size={16} /></button>
+         {/* Stats row */}
+         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {(['all', 'pending', 'approved', 'rejected'] as const).map(s => (
+               <button
+                  key={s}
+                  onClick={() => setStatusFilter(s)}
+                  className={`p-4 rounded-2xl border-2 text-left transition-all ${statusFilter === s ? 'bg-navy-900 text-white border-navy-900 shadow-lg' : 'bg-white border-navy-50 hover:border-navy-200'}`}
+               >
+                  <p className={`text-2xl font-black mb-1 ${statusFilter === s ? 'text-gold-400' : 'text-navy-900'}`}>
+                     {counts[s]}
+                  </p>
+                  <p className={`text-[10px] font-black uppercase tracking-widest ${statusFilter === s ? 'text-white/70' : 'text-navy-400'}`}>
+                     {s}
+                  </p>
+               </button>
+            ))}
+         </div>
+
+         {/* Search */}
+         <div className="relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-navy-300" size={16} />
+            <input
+               className="w-full pl-11 pr-4 py-3 bg-white border border-navy-50 rounded-2xl text-sm font-medium shadow-sm focus:border-gold-400 outline-none"
+               placeholder="Search by user, chapter, or content..."
+               value={searchQuery}
+               onChange={e => setSearchQuery(e.target.value)}
+            />
+         </div>
+
+         {/* Reflection cards */}
+         {filtered.length === 0 ? (
+            <Card>
+               <div className="p-16 text-center text-navy-300 italic">
+                  {counts.all === 0 ? 'No reflections in the queue yet.' : 'No reflections match your filter.'}
+               </div>
+            </Card>
+         ) : (
+            <div className="space-y-4">
+               {filtered.map(r => (
+                  <Card key={r.id} className={`p-6 border-l-4 ${r.status === 'approved' ? 'border-l-green-500' : r.status === 'rejected' ? 'border-l-red-400' : 'border-l-gold-500'}`}>
+                     <div className="flex flex-col md:flex-row gap-6">
+                        <div className="shrink-0 md:w-48 space-y-1">
+                           <p className="font-bold text-navy-900 text-sm">{r.userName}</p>
+                           <p className="text-[10px] text-navy-400">{new Date(r.timestamp).toLocaleDateString()}</p>
+                           <p className="text-[9px] font-black uppercase text-purple-600">{r.chapterTitle}</p>
+                           <span className={`inline-block px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest ${statusColor(r.status)}`}>
+                              {r.status}
+                           </span>
+                        </div>
+
+                        <div className="flex-grow space-y-3">
+                           <p className="text-sm text-navy-700 italic leading-relaxed bg-neutral-50 rounded-xl p-4 border border-navy-50">
+                              "{r.content}"
+                           </p>
+
+                           {r.adminComments && (
+                              <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-xl border border-blue-100">
+                                 <MessageCircle size={14} className="text-blue-500 mt-0.5 shrink-0" />
+                                 <p className="text-xs text-blue-800 font-medium">{r.adminComments}</p>
+                              </div>
+                           )}
+
+                           {expandedId === r.id && (
+                              <div className="space-y-2">
+                                 <textarea
+                                    className="w-full p-3 bg-white border border-navy-100 rounded-xl text-sm resize-none h-20 focus:border-gold-400 outline-none"
+                                    placeholder="Add admin note or feedback..."
+                                    value={adminComment[r.id] ?? r.adminComments ?? ''}
+                                    onChange={e => setAdminComment(prev => ({ ...prev, [r.id]: e.target.value }))}
+                                 />
+                                 <div className="flex gap-2">
+                                    <button onClick={() => saveAdminComment(r.id)} className="px-4 py-2 bg-navy-900 text-white rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-navy-800">
+                                       <Check size={12} /> Save Note
+                                    </button>
+                                    <button onClick={() => setExpandedId(null)} className="px-4 py-2 bg-neutral-100 text-navy-600 rounded-lg text-[10px] font-black uppercase tracking-widest">
+                                       Cancel
+                                    </button>
                                  </div>
-                              )}
-                           </td>
-                        </tr>
-                     ))}
-                  </tbody>
-               </table>
+                              </div>
+                           )}
+                        </div>
+
+                        <div className="flex md:flex-col gap-2 shrink-0 justify-end md:justify-start">
+                           {r.status === 'pending' && (
+                              <>
+                                 <button
+                                    onClick={() => updateStatus(r.id, 'approved')}
+                                    className="flex items-center gap-1.5 px-4 py-2 bg-green-50 text-green-700 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-green-100 transition-colors border border-green-200"
+                                 >
+                                    <CheckCircle2 size={14} /> Approve
+                                 </button>
+                                 <button
+                                    onClick={() => updateStatus(r.id, 'rejected')}
+                                    className="flex items-center gap-1.5 px-4 py-2 bg-red-50 text-red-600 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-red-100 transition-colors border border-red-200"
+                                 >
+                                    <XCircle size={14} /> Reject
+                                 </button>
+                              </>
+                           )}
+                           {r.status !== 'pending' && (
+                              <button
+                                 onClick={() => updateStatus(r.id, r.status === 'approved' ? 'rejected' : 'approved')}
+                                 className="flex items-center gap-1.5 px-3 py-1.5 bg-neutral-100 text-navy-600 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-neutral-200 transition-colors"
+                              >
+                                 <RefreshCw size={12} /> Reverse
+                              </button>
+                           )}
+                           <button
+                              onClick={() => setExpandedId(expandedId === r.id ? null : r.id)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-blue-100 transition-colors"
+                           >
+                              <MessageCircle size={12} /> {r.adminComments ? 'Edit Note' : 'Add Note'}
+                           </button>
+                        </div>
+                     </div>
+                  </Card>
+               ))}
             </div>
-         </Card>
+         )}
       </div>
    );
 };
@@ -1538,6 +1661,547 @@ const BrandingManager = ({ adminEmail }: { adminEmail: string }) => {
    );
 };
 
+// --- ARTICLE COMMENT MODERATION ---
+
+const ArticleCommentModeration = ({ adminEmail }: { adminEmail: string }) => {
+   const [comments, setComments] = useState<ArticleComment[]>([]);
+   const [articles, setArticles] = useState<Record<string, string>>({});
+   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
+   const [isLoading, setIsLoading] = useState(true);
+
+   const load = async () => {
+      setIsLoading(true);
+      try {
+         const commentsSnap = await getDocs(
+            query(collection(db, 'articleComments'), orderBy('timestamp', 'desc'))
+         );
+         const allComments: ArticleComment[] = commentsSnap.docs.map(d => ({
+            id: d.id,
+            ...d.data()
+         } as ArticleComment));
+         setComments(allComments);
+
+         // Build article title lookup
+         const articleIds = [...new Set(allComments.map(c => c.articleId))];
+         const titleMap: Record<string, string> = {};
+         await Promise.all(articleIds.map(async (id) => {
+            try {
+               const snap = await getDocs(query(collection(db, 'articles'), where('__name__', '==', id)));
+               if (!snap.empty) titleMap[id] = (snap.docs[0].data() as Article).title;
+               else titleMap[id] = id;
+            } catch { titleMap[id] = id; }
+         }));
+         setArticles(titleMap);
+      } catch (err) {
+         console.error('Failed to load article comments', err);
+      } finally {
+         setIsLoading(false);
+      }
+   };
+
+   useEffect(() => { load(); }, []);
+
+   const updateCommentStatus = async (commentId: string, status: 'approved' | 'rejected') => {
+      try {
+         await updateDoc(doc(db, 'articleComments', commentId), { status });
+         setComments(prev => prev.map(c => c.id === commentId ? { ...c, status } : c));
+         logAdminAction(adminEmail, `Article Comment ${status}`, commentId);
+      } catch (err) {
+         console.error('Failed to update comment status', err);
+         alert('Failed to update status. Check admin permissions.');
+      }
+   };
+
+   const deleteComment = async (commentId: string) => {
+      if (!window.confirm('Permanently delete this comment?')) return;
+      try {
+         await deleteDoc(doc(db, 'articleComments', commentId));
+         setComments(prev => prev.filter(c => c.id !== commentId));
+         logAdminAction(adminEmail, 'Deleted Article Comment', commentId);
+      } catch (err) {
+         console.error('Failed to delete comment', err);
+         alert('Failed to delete comment.');
+      }
+   };
+
+   const counts = {
+      all: comments.length,
+      pending: comments.filter(c => c.status === 'pending').length,
+      approved: comments.filter(c => c.status === 'approved').length,
+      rejected: comments.filter(c => c.status === 'rejected').length,
+   };
+
+   const filtered = comments.filter(c => statusFilter === 'all' || c.status === statusFilter);
+
+   return (
+      <div className="space-y-8 animate-in fade-in">
+         <div className="flex justify-between items-end">
+            <div>
+               <h2 className="text-3xl font-serif font-bold text-navy-900">Article Comments</h2>
+               <p className="text-sm text-navy-400">Moderate reader comments on published articles.</p>
+            </div>
+            <button onClick={load} disabled={isLoading} className="flex items-center gap-2 px-4 py-2 bg-neutral-100 text-navy-600 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-neutral-200 transition-colors disabled:opacity-50">
+               <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} /> Refresh
+            </button>
+         </div>
+
+         {/* Stats */}
+         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {(['all', 'pending', 'approved', 'rejected'] as const).map(s => (
+               <button
+                  key={s}
+                  onClick={() => setStatusFilter(s)}
+                  className={`p-4 rounded-2xl border-2 text-left transition-all ${statusFilter === s ? 'bg-navy-900 text-white border-navy-900 shadow-lg' : 'bg-white border-navy-50 hover:border-navy-200'}`}
+               >
+                  <p className={`text-2xl font-black mb-1 ${statusFilter === s ? 'text-gold-400' : 'text-navy-900'}`}>{counts[s]}</p>
+                  <p className={`text-[10px] font-black uppercase tracking-widest ${statusFilter === s ? 'text-white/70' : 'text-navy-400'}`}>{s}</p>
+               </button>
+            ))}
+         </div>
+
+         <Card>
+            {isLoading ? (
+               <div className="p-12 text-center flex items-center justify-center gap-3 text-navy-300">
+                  <RefreshCw size={20} className="animate-spin" /><span>Loading comments...</span>
+               </div>
+            ) : filtered.length === 0 ? (
+               <div className="p-16 text-center text-navy-300 italic">No comments match this filter.</div>
+            ) : (
+               <div className="divide-y divide-navy-50">
+                  {filtered.map(c => (
+                     <div key={c.id} className="p-6 flex flex-col md:flex-row gap-4 group">
+                        <div className="shrink-0 md:w-48 space-y-1">
+                           <p className="font-bold text-navy-900 text-sm">{c.userName}</p>
+                           <p className="text-[10px] text-navy-400">{new Date(c.timestamp).toLocaleDateString()}</p>
+                           <p className="text-[9px] text-purple-600 font-bold truncate" title={articles[c.articleId] || c.articleId}>
+                              {articles[c.articleId] || c.articleId}
+                           </p>
+                           <span className={`inline-block px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest ${c.status === 'approved' ? 'bg-green-100 text-green-700' :
+                                 c.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-gold-100 text-gold-700'
+                              }`}>{c.status}</span>
+                        </div>
+                        <div className="flex-grow">
+                           <p className="text-sm text-navy-700 leading-relaxed bg-neutral-50 rounded-xl p-4 border border-navy-50 italic">
+                              "{c.content}"
+                           </p>
+                        </div>
+                        <div className="flex md:flex-col gap-2 shrink-0 justify-end">
+                           {c.status === 'pending' && (
+                              <>
+                                 <button onClick={() => updateCommentStatus(c.id, 'approved')} className="flex items-center gap-1.5 px-3 py-2 bg-green-50 text-green-700 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-green-100 border border-green-200">
+                                    <CheckCircle2 size={14} /> Approve
+                                 </button>
+                                 <button onClick={() => updateCommentStatus(c.id, 'rejected')} className="flex items-center gap-1.5 px-3 py-2 bg-red-50 text-red-600 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-red-100 border border-red-200">
+                                    <XCircle size={14} /> Reject
+                                 </button>
+                              </>
+                           )}
+                           {c.status !== 'pending' && (
+                              <button onClick={() => updateCommentStatus(c.id, c.status === 'approved' ? 'rejected' : 'approved')} className="flex items-center gap-1.5 px-3 py-1.5 bg-neutral-100 text-navy-600 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-neutral-200">
+                                 <RefreshCw size={12} /> Reverse
+                              </button>
+                           )}
+                           <button onClick={() => deleteComment(c.id)} className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-500 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-red-100">
+                              <Trash2 size={12} /> Delete
+                           </button>
+                        </div>
+                     </div>
+                  ))}
+               </div>
+            )}
+         </Card>
+      </div>
+   );
+};
+
+// --- ARTICLE MANAGER ---
+
+const EMPTY_ARTICLE: Omit<Article, 'id'> = {
+   title: '',
+   excerpt: '',
+   content: '',
+   imageUrl: '',
+   author: '',
+   authorUid: '',
+   tags: [],
+   publishedAt: new Date().toISOString(),
+   updatedAt: new Date().toISOString(),
+   status: 'draft',
+   commentsEnabled: true,
+};
+
+const ArticleManager = ({ adminEmail, user }: { adminEmail: string; user: UserProfile | null }) => {
+   const [articles, setArticles] = useState<Article[]>([]);
+   const [isLoading, setIsLoading] = useState(true);
+   const [view, setView] = useState<'list' | 'editor'>('list');
+   const [editing, setEditing] = useState<Article | null>(null);
+   const [form, setForm] = useState<Omit<Article, 'id'>>(EMPTY_ARTICLE);
+   const [tagInput, setTagInput] = useState('');
+   const [isSaving, setIsSaving] = useState(false);
+
+   const loadArticles = async () => {
+      setIsLoading(true);
+      try {
+         const snap = await getDocs(query(collection(db, 'articles'), orderBy('updatedAt', 'desc')));
+         setArticles(snap.docs.map(d => ({ id: d.id, ...d.data() } as Article)));
+      } catch (err) {
+         console.error('Failed to load articles', err);
+      } finally {
+         setIsLoading(false);
+      }
+   };
+
+   useEffect(() => { loadArticles(); }, []);
+
+   const openNew = () => {
+      setEditing(null);
+      setForm({ ...EMPTY_ARTICLE, author: user?.name || 'Admin', authorUid: user?.uid || '' });
+      setTagInput('');
+      setView('editor');
+   };
+
+   const openEdit = (article: Article) => {
+      setEditing(article);
+      setForm({ ...article });
+      setTagInput('');
+      setView('editor');
+   };
+
+   const saveArticle = async () => {
+      if (!form.title.trim() || !form.content.trim()) {
+         alert('Title and content are required.');
+         return;
+      }
+      setIsSaving(true);
+      try {
+         const now = new Date().toISOString();
+         if (editing) {
+            const updated = { ...form, updatedAt: now };
+            await updateDoc(doc(db, 'articles', editing.id), updated);
+            setArticles(prev => prev.map(a => a.id === editing.id ? { ...a, ...updated } : a));
+            logAdminAction(adminEmail, 'Updated Article', form.title);
+         } else {
+            const newArticle = {
+               ...form,
+               publishedAt: form.status === 'published' ? now : form.publishedAt,
+               updatedAt: now,
+            };
+            const docRef = await addDoc(collection(db, 'articles'), newArticle);
+            setArticles(prev => [{ id: docRef.id, ...newArticle }, ...prev]);
+            logAdminAction(adminEmail, 'Created Article', form.title);
+         }
+         setView('list');
+         setEditing(null);
+      } catch (err: any) {
+         console.error('Failed to save article', err);
+         alert(`Save failed: ${err?.message || 'Unknown error'}`);
+      } finally {
+         setIsSaving(false);
+      }
+   };
+
+   const togglePublish = async (article: Article) => {
+      const newStatus = article.status === 'published' ? 'draft' : 'published';
+      const now = new Date().toISOString();
+      try {
+         await updateDoc(doc(db, 'articles', article.id), {
+            status: newStatus,
+            publishedAt: newStatus === 'published' ? now : article.publishedAt,
+            updatedAt: now,
+         });
+         setArticles(prev => prev.map(a => a.id === article.id ? { ...a, status: newStatus, updatedAt: now } : a));
+         logAdminAction(adminEmail, `Article ${newStatus === 'published' ? 'Published' : 'Unpublished'}`, article.title);
+      } catch (err) {
+         console.error('Failed to toggle publish', err);
+         alert('Failed to update article status.');
+      }
+   };
+
+   const deleteArticle = async (article: Article) => {
+      if (!window.confirm(`Delete "${article.title}"? This cannot be undone.`)) return;
+      try {
+         await deleteDoc(doc(db, 'articles', article.id));
+         setArticles(prev => prev.filter(a => a.id !== article.id));
+         logAdminAction(adminEmail, 'Deleted Article', article.title);
+      } catch (err) {
+         console.error('Failed to delete article', err);
+         alert('Failed to delete article.');
+      }
+   };
+
+   const addTag = () => {
+      const t = tagInput.trim().toLowerCase();
+      if (t && !form.tags.includes(t)) {
+         setForm(prev => ({ ...prev, tags: [...prev.tags, t] }));
+      }
+      setTagInput('');
+   };
+
+   const removeTag = (tag: string) => {
+      setForm(prev => ({ ...prev, tags: prev.tags.filter(t => t !== tag) }));
+   };
+
+   if (view === 'editor') {
+      return (
+         <div className="space-y-8 animate-in fade-in">
+            <div className="flex items-center justify-between">
+               <div className="flex items-center gap-4">
+                  <button onClick={() => setView('list')} className="p-2 bg-neutral-100 text-navy-600 rounded-xl hover:bg-neutral-200 transition-colors">
+                     <ArrowLeft size={20} />
+                  </button>
+                  <div>
+                     <h2 className="text-3xl font-serif font-bold text-navy-900">
+                        {editing ? 'Edit Article' : 'New Article'}
+                     </h2>
+                     <p className="text-sm text-navy-400">Create spiritual content for the community.</p>
+                  </div>
+               </div>
+               <div className="flex gap-3">
+                  <button
+                     onClick={() => setForm(prev => ({ ...prev, status: prev.status === 'draft' ? 'published' : 'draft' }))}
+                     className={`flex items-center gap-2 px-5 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all border-2 ${form.status === 'published' ? 'border-green-500 bg-green-50 text-green-700' : 'border-navy-100 bg-white text-navy-400'}`}
+                  >
+                     <GlobeIcon size={14} />
+                     {form.status === 'published' ? 'Published' : 'Draft'}
+                  </button>
+                  <button
+                     onClick={saveArticle}
+                     disabled={isSaving}
+                     className="flex items-center gap-2 px-6 py-3 bg-gold-gradient text-navy-900 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-md hover:scale-105 disabled:opacity-50 transition-all"
+                  >
+                     {isSaving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
+                     {isSaving ? 'Saving...' : 'Save Article'}
+                  </button>
+               </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+               {/* Main editor */}
+               <div className="lg:col-span-2 space-y-6">
+                  <Card className="p-6 space-y-6">
+                     <h3 className="text-sm font-black uppercase text-navy-300 tracking-widest">Content</h3>
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-navy-500 uppercase">Title *</label>
+                        <input
+                           className="w-full p-3 bg-neutral-50 rounded-xl border border-navy-50 text-lg font-serif font-bold focus:border-gold-400 outline-none"
+                           placeholder="Article headline..."
+                           value={form.title}
+                           onChange={e => setForm(prev => ({ ...prev, title: e.target.value }))}
+                        />
+                     </div>
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-navy-500 uppercase">Excerpt / Summary</label>
+                        <textarea
+                           className="w-full p-3 bg-neutral-50 rounded-xl border border-navy-50 text-sm resize-none h-20 focus:border-gold-400 outline-none"
+                           placeholder="Brief summary shown in the article list..."
+                           value={form.excerpt}
+                           onChange={e => setForm(prev => ({ ...prev, excerpt: e.target.value }))}
+                        />
+                     </div>
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-navy-500 uppercase">Full Content (HTML) *</label>
+                        <textarea
+                           className="w-full p-4 bg-neutral-50 rounded-xl border border-navy-50 text-sm font-mono h-64 resize-y focus:border-gold-400 outline-none leading-relaxed"
+                           placeholder="<p>Start writing your article here...</p>&#10;<p>You can use HTML for formatting.</p>"
+                           value={form.content}
+                           onChange={e => setForm(prev => ({ ...prev, content: e.target.value }))}
+                        />
+                        <p className="text-[10px] text-navy-400">Supports HTML: &lt;p&gt;, &lt;h2&gt;, &lt;strong&gt;, &lt;em&gt;, &lt;ul&gt;, &lt;li&gt;, &lt;blockquote&gt;</p>
+                     </div>
+                  </Card>
+               </div>
+
+               {/* Sidebar */}
+               <div className="space-y-6">
+                  <Card className="p-6 space-y-5">
+                     <h3 className="text-sm font-black uppercase text-navy-300 tracking-widest">Metadata</h3>
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-navy-500 uppercase">Author</label>
+                        <input
+                           className="w-full p-3 bg-neutral-50 rounded-xl border border-navy-50 text-sm font-bold focus:border-gold-400 outline-none"
+                           value={form.author}
+                           onChange={e => setForm(prev => ({ ...prev, author: e.target.value }))}
+                           placeholder="Author name"
+                        />
+                     </div>
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-navy-500 uppercase">Cover Image URL</label>
+                        <input
+                           className="w-full p-3 bg-neutral-50 rounded-xl border border-navy-50 text-sm focus:border-gold-400 outline-none"
+                           value={form.imageUrl || ''}
+                           onChange={e => setForm(prev => ({ ...prev, imageUrl: e.target.value }))}
+                           placeholder="https://..."
+                        />
+                        {form.imageUrl && (
+                           <img src={form.imageUrl} className="w-full h-24 object-cover rounded-lg border border-navy-50" alt="Cover preview" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                        )}
+                     </div>
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-navy-500 uppercase">Tags</label>
+                        <div className="flex gap-2">
+                           <input
+                              className="flex-grow p-2 bg-neutral-50 rounded-xl border border-navy-50 text-sm focus:border-gold-400 outline-none"
+                              placeholder="Add tag..."
+                              value={tagInput}
+                              onChange={e => setTagInput(e.target.value)}
+                              onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addTag())}
+                           />
+                           <button onClick={addTag} className="px-3 py-2 bg-navy-900 text-white rounded-xl text-[10px] font-black">Add</button>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                           {form.tags.map(t => (
+                              <span key={t} className="flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-[9px] font-black uppercase">
+                                 <Tag size={9} /> {t}
+                                 <button onClick={() => removeTag(t)} className="ml-1 hover:text-red-500"><X size={10} /></button>
+                              </span>
+                           ))}
+                        </div>
+                     </div>
+                     <div className="flex items-center justify-between py-2 border-t border-navy-50">
+                        <div>
+                           <p className="text-sm font-bold text-navy-900">Enable Comments</p>
+                           <p className="text-[10px] text-navy-400">Allow readers to submit reflections</p>
+                        </div>
+                        <button
+                           onClick={() => setForm(prev => ({ ...prev, commentsEnabled: !prev.commentsEnabled }))}
+                           className={`w-12 h-6 rounded-full transition-all relative ${form.commentsEnabled ? 'bg-green-500' : 'bg-neutral-200'}`}
+                        >
+                           <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${form.commentsEnabled ? 'left-7' : 'left-0.5'}`} />
+                        </button>
+                     </div>
+                  </Card>
+
+                  {/* Live preview snippet */}
+                  {form.content && (
+                     <Card className="p-6">
+                        <h3 className="text-sm font-black uppercase text-navy-300 tracking-widest mb-4">Content Preview</h3>
+                        <div
+                           className="prose prose-sm max-w-none text-navy-800 font-serif"
+                           dangerouslySetInnerHTML={{ __html: form.content.substring(0, 500) + (form.content.length > 500 ? '...' : '') }}
+                        />
+                     </Card>
+                  )}
+               </div>
+            </div>
+         </div>
+      );
+   }
+
+   // LIST VIEW
+   return (
+      <div className="space-y-8 animate-in fade-in">
+         <div className="flex justify-between items-end">
+            <div>
+               <h2 className="text-3xl font-serif font-bold text-navy-900">Article Manager</h2>
+               <p className="text-sm text-navy-400">Create and publish articles for the community.</p>
+            </div>
+            <div className="flex gap-3">
+               <button onClick={loadArticles} disabled={isLoading} className="flex items-center gap-2 px-4 py-2 bg-neutral-100 text-navy-600 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-neutral-200 transition-colors disabled:opacity-50">
+                  <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} /> Refresh
+               </button>
+               <button onClick={openNew} className="flex items-center gap-2 px-6 py-3 bg-gold-gradient text-navy-900 rounded-xl font-black uppercase text-[10px] shadow-md hover:scale-105 transition-all">
+                  <Plus size={14} /> New Article
+               </button>
+            </div>
+         </div>
+
+         {/* Stats */}
+         <div className="grid grid-cols-3 gap-4">
+            {[
+               { label: 'Total', value: articles.length, color: 'text-navy-900' },
+               { label: 'Published', value: articles.filter(a => a.status === 'published').length, color: 'text-green-600' },
+               { label: 'Drafts', value: articles.filter(a => a.status === 'draft').length, color: 'text-gold-600' },
+            ].map(s => (
+               <div key={s.label} className="bg-white rounded-2xl p-5 border border-navy-50 shadow-sm">
+                  <p className={`text-3xl font-black mb-1 ${s.color}`}>{s.value}</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-navy-400">{s.label}</p>
+               </div>
+            ))}
+         </div>
+
+         {isLoading ? (
+            <Card>
+               <div className="p-12 text-center flex items-center justify-center gap-3 text-navy-300">
+                  <RefreshCw size={20} className="animate-spin" /><span>Loading articles...</span>
+               </div>
+            </Card>
+         ) : articles.length === 0 ? (
+            <Card>
+               <div className="p-16 text-center space-y-4">
+                  <BookMarked size={48} className="text-navy-200 mx-auto" />
+                  <p className="text-navy-400 font-medium">No articles yet.</p>
+                  <button onClick={openNew} className="px-6 py-3 bg-navy-900 text-white rounded-xl font-black uppercase text-[10px] tracking-widest">
+                     Create Your First Article
+                  </button>
+               </div>
+            </Card>
+         ) : (
+            <Card>
+               <table className="w-full text-left">
+                  <thead className="bg-neutral-50 text-[10px] font-black uppercase tracking-widest text-navy-400">
+                     <tr>
+                        <th className="p-5">Article</th>
+                        <th className="p-5">Status</th>
+                        <th className="p-5">Tags</th>
+                        <th className="p-5">Updated</th>
+                        <th className="p-5 text-right">Actions</th>
+                     </tr>
+                  </thead>
+                  <tbody className="divide-y divide-navy-50">
+                     {articles.map(a => (
+                        <tr key={a.id} className="hover:bg-neutral-50/50 transition-colors group">
+                           <td className="p-5">
+                              <div className="flex items-start gap-3">
+                                 {a.imageUrl && (
+                                    <img src={a.imageUrl} className="w-12 h-12 object-cover rounded-lg border border-navy-50 shrink-0" alt="" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                                 )}
+                                 <div>
+                                    <p className="font-bold text-navy-900 text-sm leading-snug line-clamp-2">{a.title}</p>
+                                    <p className="text-[10px] text-navy-400 mt-0.5">{a.author}</p>
+                                 </div>
+                              </div>
+                           </td>
+                           <td className="p-5">
+                              <span className={`px-2 py-1 rounded text-[9px] font-black uppercase tracking-widest ${a.status === 'published' ? 'bg-green-100 text-green-700' : 'bg-neutral-100 text-navy-500'}`}>
+                                 {a.status}
+                              </span>
+                           </td>
+                           <td className="p-5">
+                              <div className="flex flex-wrap gap-1">
+                                 {a.tags.slice(0, 2).map(t => (
+                                    <span key={t} className="px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded text-[9px] font-bold">{t}</span>
+                                 ))}
+                                 {a.tags.length > 2 && <span className="text-[9px] text-navy-400">+{a.tags.length - 2}</span>}
+                              </div>
+                           </td>
+                           <td className="p-5 text-[10px] text-navy-400">{new Date(a.updatedAt).toLocaleDateString()}</td>
+                           <td className="p-5 text-right">
+                              <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                 <button onClick={() => openEdit(a)} title="Edit" className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100">
+                                    <Edit3 size={15} />
+                                 </button>
+                                 <button
+                                    onClick={() => togglePublish(a)}
+                                    title={a.status === 'published' ? 'Unpublish' : 'Publish'}
+                                    className={`p-2 rounded-lg ${a.status === 'published' ? 'bg-orange-50 text-orange-600 hover:bg-orange-100' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}
+                                 >
+                                    <GlobeIcon size={15} />
+                                 </button>
+                                 <button onClick={() => deleteArticle(a)} title="Delete" className="p-2 bg-red-50 text-red-500 rounded-lg hover:bg-red-100">
+                                    <Trash2 size={15} />
+                                 </button>
+                              </div>
+                           </td>
+                        </tr>
+                     ))}
+                  </tbody>
+               </table>
+            </Card>
+         )}
+      </div>
+   );
+};
+
 // --- BOOK CLUB ANALYTICS ---
 
 const BookClubAnalytics: React.FC = () => {
@@ -1908,10 +2572,12 @@ const AdminPage: React.FC<{ user: UserProfile | null }> = ({ user }) => {
                <AdminNavItem active={activeModule === 'notifications'} onClick={() => setActiveModule('notifications')} icon={<Bell size={20} />} label="Push Notifications" />
                <AdminNavItem active={activeModule === 'events'} onClick={() => setActiveModule('events')} icon={<Calendar size={20} />} label="Event Manager" />
                <AdminNavItem active={activeModule === 'content'} onClick={() => setActiveModule('content')} icon={<BookOpen size={20} />} label="Content Studio" />
+               <AdminNavItem active={activeModule === 'articles'} onClick={() => setActiveModule('articles')} icon={<Newspaper size={20} />} label="Article Manager" />
                <div className="my-4 border-t border-navy-50"></div>
                <h4 className="text-[9px] font-black uppercase text-navy-200 tracking-[0.3em] px-6 mb-4">Registry & Data</h4>
                <AdminNavItem active={activeModule === 'users'} onClick={() => setActiveModule('users')} icon={<Users size={20} />} label="Member Registry" />
                <AdminNavItem active={activeModule === 'reflections'} onClick={() => setActiveModule('reflections')} icon={<Quote size={20} />} label="Reflection Queue" />
+               <AdminNavItem active={activeModule === 'article_comments'} onClick={() => setActiveModule('article_comments')} icon={<MessageCircle size={20} />} label="Article Comments" />
                <AdminNavItem active={activeModule === 'sadhana'} onClick={() => setActiveModule('sadhana')} icon={<Activity size={20} />} label="Sadhana Analytics" />
                <AdminNavItem active={activeModule === 'bookclub_analytics'} onClick={() => setActiveModule('bookclub_analytics')} icon={<Trophy size={20} />} label="Book Club Analytics" />
                <div className="my-4 border-t border-navy-50"></div>
@@ -1930,6 +2596,8 @@ const AdminPage: React.FC<{ user: UserProfile | null }> = ({ user }) => {
                {activeModule === 'bookclub_analytics' && <BookClubAnalytics />}
                {activeModule === 'users' && <UserRegistry adminEmail={user?.email || 'admin'} />}
                {activeModule === 'reflections' && <ReflectionQueue adminEmail={user?.email || 'admin'} />}
+               {activeModule === 'articles' && <ArticleManager adminEmail={user?.email || 'admin'} user={user} />}
+               {activeModule === 'article_comments' && <ArticleCommentModeration adminEmail={user?.email || 'admin'} />}
                {activeModule === 'sadhana' && <SadhanaAnalytics />}
             </main>
          </div>

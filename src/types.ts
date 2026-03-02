@@ -209,6 +209,32 @@ export interface JournalEntry {
   timestamp: string;
 }
 
+export interface Article {
+  id: string;
+  title: string;
+  excerpt: string;
+  content: string; // HTML content
+  imageUrl?: string;
+  author: string;
+  authorUid: string;
+  tags: string[];
+  publishedAt: string;
+  updatedAt: string;
+  status: 'draft' | 'published';
+  commentsEnabled: boolean;
+}
+
+export interface ArticleComment {
+  id: string;
+  articleId: string;
+  uid: string;
+  userName: string;
+  userAvatarUrl?: string;
+  content: string;
+  timestamp: string;
+  status: 'pending' | 'approved' | 'rejected';
+}
+
 export interface BrandingConfig {
   logoHeader: string;
   logoFooter: string;

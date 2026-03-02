@@ -4,7 +4,7 @@ import { Minus, Plus, Send, CheckCircle2, Sparkles, Lock, Check, UserPlus, X, Al
 import { DEFAULT_SITE_CONTENT } from '../constants';
 import { SiteContent } from '../types';
 import { db } from '../lib/firebase';
-import { doc, getDoc, setDoc, collection, increment as firebaseIncrement } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, increment as firebaseIncrement, query, where, getDocs, limit } from 'firebase/firestore';
 import { recordSadhanaOffering } from '../lib/nationalStats';
 
 const AvatarOption = ({ gender, selected, onClick }: { gender: 'male' | 'female', selected: boolean, onClick: () => void }) => (
@@ -179,6 +179,16 @@ const ChantingPage: React.FC = () => {
       return;
     }
 
+    if (formData.count <= 0) {
+      alert("Please enter a valid count greater than 0.");
+      return;
+    }
+
+    if (formData.count > 100000) {
+      alert("Count seems unusually high. Please verify and submit in smaller batches.");
+      return;
+    }
+
     const type = chantingType === 'Gayathri' ? 'gayathri' : 'saiGayathri';
     const lastSubmitTime = localStorage.getItem(`last_${type}_submit`);
     if (lastSubmitTime && Date.now() - parseInt(lastSubmitTime) < 10000) {
@@ -189,6 +199,32 @@ const ChantingPage: React.FC = () => {
 
     setIsSubmitting(true);
     setSubmissionError(null);
+
+    // Duplicate Check Query
+    if (user && navigator.onLine) {
+      try {
+        const todayISO = new Date().toISOString().split('T')[0];
+        const q = query(
+          collection(db, 'sadhanaDaily'),
+          where('uid', '==', user.uid),
+          where('type', '==', type),
+          where('count', '==', formData.count),
+          where('dateStr', '==', todayISO),
+          limit(1)
+        );
+        const dupSnap = await getDocs(q);
+        if (!dupSnap.empty) {
+          const confirmSubmit = window.confirm(`You already submitted an offering of ${formData.count} ${chantingType} chants today. Are you sure you want to submit this again?`);
+          if (!confirmSubmit) {
+            setIsSubmitting(false);
+            setFormData({ count: 108 });
+            return;
+          }
+        }
+      } catch (error) {
+        console.warn("Could not check for duplicates:", error);
+      }
+    }
 
     try {
       await updateStats(type, formData.count);
@@ -233,8 +269,39 @@ const ChantingPage: React.FC = () => {
       }
     }
 
+    if (likithaUnitsToSubmit <= 0) {
+      alert("Please chant Om Sai Ram at least 11 times before offering.");
+      return;
+    }
+
     setIsSubmitting(true);
     setSubmissionError(null);
+
+    // Duplicate Check Query
+    if (user && navigator.onLine) {
+      try {
+        const todayISO = new Date().toISOString().split('T')[0];
+        const q = query(
+          collection(db, 'sadhanaDaily'),
+          where('uid', '==', user.uid),
+          where('type', '==', 'likitha'),
+          where('count', '==', likithaUnitsToSubmit * 11),
+          where('dateStr', '==', todayISO),
+          limit(1)
+        );
+        const dupSnap = await getDocs(q);
+        if (!dupSnap.empty) {
+          const confirmSubmit = window.confirm(`You already submitted an offering of ${likithaUnitsToSubmit * 11} Likitha Japam chants today. Are you sure you want to submit this again?`);
+          if (!confirmSubmit) {
+            setIsSubmitting(false);
+            setLikithaText('');
+            return;
+          }
+        }
+      } catch (error) {
+        console.warn("Could not check for duplicates:", error);
+      }
+    }
 
     try {
       await updateStats('likitha', likithaUnitsToSubmit);

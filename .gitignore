@@ -3,9 +3,17 @@ node_modules
 dist
 dist/
 .DS_Store
-*.txt
 *.cjs
+
+# Ignore plain-text files but allow specific tracked ones
+*.txt
+!public/robots.txt
+
+# Ignore generated JS but allow committed source JS files
 *.js
+!sw.js
+!deploy.sh
+
 functions/node_modules/
 firebase-debug.log
 dist/
