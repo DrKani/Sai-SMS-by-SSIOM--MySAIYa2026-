@@ -61,6 +61,7 @@ const Copyright = lazy(() => import('./pages/Copyright'));
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
 const CommunityGuidelines = lazy(() => import('./pages/CommunityGuidelines'));
 const ContentSubmissionGuidelines = lazy(() => import('./pages/ContentSubmissionGuidelines'));
+const ArticlesPage = lazy(() => import('./pages/ArticlesPage'));
 
 const PageLoader = () => (
   <div className="flex-grow flex items-center justify-center min-h-[60vh]">
@@ -263,7 +264,8 @@ const Layout: React.FC = () => {
       { title: 'Personal Dashboard', link: '/dashboard', category: 'Progress', icon: <Activity size={18} />, color: 'bg-indigo-50 text-indigo-600' },
       { title: 'Games & Puzzles', link: '/games', category: 'Edutainment', icon: <Gamepad2 size={18} />, color: 'bg-gold-50 text-gold-700' },
       { title: 'Spiritual Journal', link: '/journal', category: 'Sadhana', icon: <ScrollText size={18} />, color: 'bg-teal-50 text-teal-600' },
-      { title: 'Events Calendar', link: '/calendar', category: 'National', icon: <Calendar size={18} />, color: 'bg-blue-50 text-blue-600' }
+      { title: 'Events Calendar', link: '/calendar', category: 'National', icon: <Calendar size={18} />, color: 'bg-blue-50 text-blue-600' },
+      { title: 'Articles & Reflections', link: '/articles', category: 'Knowledge', icon: <PenTool size={18} />, color: 'bg-purple-50 text-purple-600' }
     ];
     pages.forEach(p => { if (p.title.toLowerCase().includes(lowerQ)) matches.push(p); });
     ANNUAL_STUDY_PLAN.forEach(w => {
@@ -328,6 +330,8 @@ const Layout: React.FC = () => {
             <Route path="/profile" element={<ProtectedRoute user={user}><ProfilePage /></ProtectedRoute>} />
             <Route path="/journal" element={<ProtectedRoute user={user}><JournalPage /></ProtectedRoute>} />
             <Route path="/announcements" element={<AnnouncementsPage />} />
+            <Route path="/articles" element={<ArticlesPage user={user} />} />
+            <Route path="/articles/:articleId" element={<ArticlesPage user={user} />} />
             <Route path="/calendar" element={<CalendarPage />} />
             <Route path="/setup" element={<ProtectedRoute user={user}><SetupPage /></ProtectedRoute>} />
             <Route path="/admin" element={isAdmin ? <AdminPage user={user} /> : <Navigate to="/" />} />
@@ -366,6 +370,7 @@ const Layout: React.FC = () => {
                     <MenuLink to="/book-club" label="Sai Lit Club" icon={<Library size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname.startsWith('/book-club')} />
                     <MenuLink to="/games" label="Play it" icon={<Gamepad2 size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/games'} />
                     <MenuLink to="/journal" label="Reflections" icon={<ScrollText size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/journal'} />
+                    <MenuLink to="/articles" label="Articles" icon={<PenTool size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname.startsWith('/articles')} />
                     <MenuLink to="/profile" label="Profile" icon={<UserCircle size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/profile'} />
                   </>
                 ) : (
@@ -374,6 +379,7 @@ const Layout: React.FC = () => {
                     <MenuLink to="/signup" label="Sign Up" icon={<UserPlus size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/signup'} />
                     <MenuLink to="/namasmarana" label="Mantra Tracking" icon={<Mic size={18} />} onClick={() => setIsMenuOpen(false)} isProtected isLocked />
                     <MenuLink to="/book-club" label="Sai Lit Club" icon={<Library size={18} />} onClick={() => setIsMenuOpen(false)} isProtected isLocked />
+                    <MenuLink to="/articles" label="Articles" icon={<PenTool size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname.startsWith('/articles')} />
                   </>
                 )}
                 {isAdmin && <MenuLink to="/admin" label="Admin Hub" icon={<Shield size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/admin'} />}
