@@ -209,3 +209,118 @@ export interface SiteContent {
   footerAboutText: string;
   chantingIntroText: string;
 }
+
+// --- Notification ---
+// Collection: notifications/{notificationId}
+export interface Notification {
+  notificationId: string;
+  uid: string;                    // Target user UID
+  title: string;
+  body: string;
+  type: 'announcement' | 'badge' | 'streak' | 'reminder' | 'system';
+  isRead: boolean;
+  deliveredAt: string;            // ISO timestamp (server sets on delivery)
+  fcmToken?: string;              // FCM token used for delivery
+  data?: Record<string, string>;  // Extra key-value payload for deep-linking
+  createdAt: string;              // ISO timestamp
+}
+
+// --- Article ---
+// Collection: articles/{articleId}
+export interface Article {
+  articleId: string;
+  title: string;
+  slug: string;                   // URL-safe identifier, must be unique
+  content: string;                // Markdown / rich text body
+  excerpt: string;                // Short preview (≤200 chars)
+  authorUid: string;
+  authorName: string;
+  category: string;
+  tags: string[];
+  coverImageUrl?: string;
+  status: 'draft' | 'published' | 'archived';
+  publishedAt?: string;           // ISO timestamp; null when not yet published
+  createdAt: string;
+  updatedAt: string;
+  viewCount: number;
+  likeCount: number;
+  commentCount: number;
+}
+
+// --- Comment ---
+// Collection: comments/{commentId}
+export interface Comment {
+  commentId: string;
+  articleId: string;              // Parent article
+  uid: string;
+  userName: string;
+  content: string;
+  isApproved: boolean;            // Requires admin approval before display
+  parentCommentId?: string;       // Set for nested replies
+  createdAt: string;
+  updatedAt?: string;
+}
+
+// --- Poll ---
+// Collection: polls/{pollId}
+export interface PollOption {
+  optionId: string;
+  text: string;
+  voteCount: number;
+}
+
+export interface Poll {
+  pollId: string;
+  question: string;
+  options: PollOption[];
+  createdBy: string;              // Admin UID
+  targetAudience: 'all' | string; // 'all', a state name, or centre name
+  status: 'draft' | 'active' | 'closed';
+  startAt: string;                // ISO timestamp
+  endAt: string;                  // ISO timestamp
+  totalResponses: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// --- PollResponse ---
+// Collection: pollResponses/{responseId}
+export interface PollResponse {
+  responseId: string;
+  pollId: string;
+  uid: string;
+  selectedOptionId: string;
+  submittedAt: string;            // ISO timestamp
+}
+
+// --- ContactSubmission ---
+// Collection: contactSubmissions/{submissionId}
+export interface ContactSubmission {
+  submissionId: string;
+  name: string;
+  email: string;
+  phone?: string;
+  subject: string;
+  message: string;
+  state?: string;
+  centre?: string;
+  status: 'new' | 'in-review' | 'resolved' | 'closed';
+  assignedTo?: string;            // Admin UID handling this submission
+  adminNotes?: string;
+  submittedAt: string;            // ISO timestamp
+  updatedAt?: string;
+}
+
+// --- Badge ---
+// Subcollection: users/{uid}/badges/{badgeId}
+export interface Badge {
+  badgeId: string;
+  uid: string;
+  type: 'reader' | 'excellence' | 'streak' | 'contributor' | 'special';
+  name: string;
+  description: string;
+  iconUrl?: string;
+  earnedAt: string;               // ISO timestamp
+  weekId?: string;                // Source book-club week, if applicable
+  metadata?: Record<string, unknown>;
+}
