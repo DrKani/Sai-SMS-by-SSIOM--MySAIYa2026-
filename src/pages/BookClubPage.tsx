@@ -481,16 +481,23 @@ const BookClubPage: React.FC = () => {
     setShowQuiz(true);
   };
 
-  const handleSaveReflection = () => {
+  const handleSaveReflection = async () => {
     if (!user || !activeWeek) return;
     localStorage.setItem(`sms_reflection_${user.uid}_${activeWeek.weekId}`, reflection);
+
+    // SEC-03: XSS prevention on reflection inputs
+    const sanitizedReflection = reflection
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
 
     const newItem: UserBriefcaseItem = {
       id: `ref-${Date.now()}`,
       type: 'reflection',
       weekId: activeWeek.weekId,
       title: `Reflection: ${activeWeek.chapterTitle}`,
-      content: reflection,
+      content: sanitizedReflection,
       timestamp: new Date().toISOString()
     };
     const newBriefcase = [...briefcase, newItem];
@@ -503,7 +510,7 @@ const BookClubPage: React.FC = () => {
     journalEntries.unshift({
       id: newItem.id,
       title: `${activeWeek.chapterTitle} (Sai Lit Club)`,
-      content: reflection,
+      content: sanitizedReflection,
       category: 'Lesson',
       entryDate: new Date().toISOString().split('T')[0],
       timestamp: newItem.timestamp
@@ -511,23 +518,27 @@ const BookClubPage: React.FC = () => {
     localStorage.setItem(journalKey, JSON.stringify(journalEntries));
 
     if (isReflectionPublic) {
-      const publicRef: Reflection = {
-        id: `pub-${Date.now()}`,
-        uid: user.uid,
-        userName: user.name,
-        weekId: activeWeek.weekId,
-        chapterTitle: activeWeek.chapterTitle,
-        content: reflection,
-        timestamp: new Date().toISOString(),
-        isPublic: true,
-        status: 'pending'
-      };
-      const publicQueue = JSON.parse(localStorage.getItem('sms_public_reflections') || '[]');
-      publicQueue.push(publicRef);
-      localStorage.setItem('sms_public_reflections', JSON.stringify(publicQueue));
+      try {
+        await addDoc(collection(db, 'reflections'), {
+          uid: user.uid,
+          userName: user.name,
+          userCentre: (user as any).centre || '',
+          weekId: activeWeek.weekId,
+          chapterTitle: activeWeek.chapterTitle,
+          content: sanitizedReflection,
+          timestamp: serverTimestamp(),
+          isPublic: true,
+          status: 'pending'
+        });
+        showToast(`Reflection submitted for review!`, "info");
+      } catch (err) {
+        console.error("Failed to save public reflection", err);
+        showToast(`Failed to submit reflection to public queue.`, "error");
+      }
+    } else {
+      showToast(`${activeWeek.weekId} · ${activeWeek.chapterTitle} saved to your Briefcase!`, "success");
     }
 
-    showToast(`${activeWeek.weekId} · ${activeWeek.chapterTitle} saved to your Briefcase!`, "success");
     setShowSidePanel(false);
   };
 
@@ -872,8 +883,8 @@ const BookClubPage: React.FC = () => {
                     {/* Mark as Read — awards Completion Badge */}
                     <button
                       onClick={handleMarkRead}
-                      disabled={hasMarkedRead || isSubmitting || user?.isGuest}
-                      className={`p-6 rounded-[2rem] border transition-all ${hasMarkedRead || user?.isGuest
+                      disabled={hasMarkedRead || isSubmitting || user?.isGuest || scrollPercentage < 90}
+                      className={`p-6 rounded-[2rem] border transition-all ${hasMarkedRead || user?.isGuest || scrollPercentage < 90
                         ? 'bg-white/5 border-white/10 opacity-70 cursor-not-allowed'
                         : isSubmitting
                           ? 'opacity-50 cursor-not-allowed border-white/10 bg-white/5'
@@ -881,29 +892,27 @@ const BookClubPage: React.FC = () => {
                         }`}
                     >
                       <div className="flex items-center justify-center gap-2 mb-1">
-                        {user?.isGuest ? <Lock size={20} className="text-navy-300" /> : <CheckCircle2 size={20} className={hasMarkedRead ? 'text-green-400' : 'text-blue-300'} />}
+                        {user?.isGuest ? <Lock size={20} className="text-navy-300" /> : scrollPercentage < 90 ? <Lock size={20} className="text-navy-300" /> : <CheckCircle2 size={20} className={hasMarkedRead ? 'text-green-400' : 'text-blue-300'} />}
                         <span className="block text-xl font-bold">{hasMarkedRead ? 'Reading Done ✓' : 'Mark as Read'}</span>
                       </div>
                       <span className="text-[10px] font-black uppercase tracking-widest text-blue-300">
-                        {user?.isGuest ? 'Sign in to save progress' : hasMarkedRead ? 'Completion badge earned' : 'Earn Completion Badge'}
+                        {user?.isGuest ? 'Sign in to save progress' : scrollPercentage < 90 ? 'Read to 90% to unlock' : hasMarkedRead ? 'Completion badge earned' : 'Earn Completion Badge'}
                       </span>
                     </button>
 
-                    {/* Take Quiz — awards Excellence Badge, always active */}
+                    {/* Take Quiz — awards Excellence Badge, gated by scroll */}
                     <button
                       onClick={handleTakeQuiz}
-                      disabled={user?.isGuest}
-                      style={{ background: user?.isGuest ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg, #F5C842 0%, #D4A017 100%)' }}
-                      className={`p-6 text-navy-900 rounded-[2rem] shadow-lg transition-all ${user?.isGuest ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'}`}
+                      disabled={user?.isGuest || scrollPercentage < 90}
+                      style={{ background: user?.isGuest || scrollPercentage < 90 ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg, #F5C842 0%, #D4A017 100%)' }}
+                      className={`p-6 ${user?.isGuest || scrollPercentage < 90 ? 'text-navy-300' : 'text-navy-900'} rounded-[2rem] shadow-lg transition-all ${user?.isGuest || scrollPercentage < 90 ? 'opacity-50 cursor-not-allowed border border-white/10' : 'hover:scale-105'}`}
                     >
                       <div className="flex items-center justify-center gap-2 mb-1">
-                        {user?.isGuest ? <Lock size={20} className="text-navy-300" /> : <Sparkles size={20} />}
-                        <span className={`block text-xl font-bold ${user?.isGuest ? 'text-white' : ''}`}>{hasEarnedExcellence ? 'Retake Quiz' : 'Take the Quiz'}</span>
+                        {user?.isGuest || scrollPercentage < 90 ? <Lock size={20} className="text-navy-300" /> : <Sparkles size={20} />}
+                        <span className="block text-xl font-bold">Take Quiz</span>
                       </div>
-                      <span className={`text-[10px] font-black uppercase tracking-widest opacity-80 ${user?.isGuest ? 'text-navy-300' : ''}`}>
-                        {user?.isGuest ? 'Sign in to take quiz' : hasEarnedExcellence
-                          ? 'Excellence badge earned ✨'
-                          : `${activeWeek.questions.length} Qs · ~${Math.ceil(activeWeek.questions.length * 0.75)} mins — Earn Excellence Badge`}
+                      <span className={`text-[10px] font-black uppercase tracking-widest ${user?.isGuest || scrollPercentage < 90 ? 'text-navy-300' : 'text-navy-700'}`}>
+                        {user?.isGuest ? 'Sign in to take quiz' : scrollPercentage < 90 ? 'Read to 90% to unlock' : 'Earn Excellence Badge'}
                       </span>
                     </button>
                   </div>

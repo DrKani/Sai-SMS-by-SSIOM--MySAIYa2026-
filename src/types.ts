@@ -12,6 +12,10 @@ export interface UserProfile {
   isAdmin?: boolean;
   onboardingDone?: boolean;
   onboardedApp?: boolean; // Tutorial: has user seen the main app onboarding tour?
+  fcmTokens?: string[]; // Push notification tokens
+  notificationsEnabled?: boolean;
+  streak?: number;
+  lastActivity?: string; // ISO Date of last submission
 
   // Extended Profile Fields
   publicReflections?: boolean;
@@ -155,21 +159,30 @@ export interface Announcement {
   validUntil?: string;
 }
 
-export interface Event {
-  id: string;
+import { Timestamp } from 'firebase/firestore';
+
+export interface SmsEvent {
+  eventId: string;
   title: string;
-  date: string;
-  time?: string;
-  location?: string;
   description: string;
-  category: string; // 'Live' (Purple), 'Virtual' (Teal), 'Festival' (Green)
-  image?: string;
-  isStudy?: boolean;
-  mapEmbed?: string;
-  meetingLink?: string; // Zoom/Meet
+  eventDate: any; // Timestamp (using any to avoid strict version mismatches if needed, but intended as Firestore Timestamp)
+  endDate?: any; // Timestamp
+  location: string; // "Online" or physical address
+  type: 'spiritual' | 'service' | 'learning' | 'festival';
+  maxAttendees?: number;
+  registeredCount: number;
+  registeredUsers: string[]; // Array of UIDs
+  imageUrl?: string;
+  createdBy: string; // Admin UID
+  createdAt: any; // Timestamp
+  status: 'draft' | 'published' | 'cancelled';
+  // Legacy fields for compatibility during transition
+  id?: string;
+  category?: string;
+  date?: string;
+  time?: string;
+  meetingLink?: string;
   rsvpLink?: string;
-  isRecurring?: boolean;
-  recurrenceRule?: 'weekly' | 'monthly';
 }
 
 export interface Quote {
@@ -208,4 +221,14 @@ export interface SiteContent {
   homeWelcomeText: string;
   footerAboutText: string;
   chantingIntroText: string;
+}
+
+export interface AppNotification {
+  id?: string;
+  uid: string;
+  title: string;
+  body: string;
+  type: 'announcement' | 'event' | 'system';
+  isRead: boolean;
+  createdAt: any; // Timestamp or string depending on where it's used
 }

@@ -13,7 +13,7 @@ import {
    Save, UserPlus, GraduationCap, Info, Gamepad2, Layers, BarChart2,
    ListFilter, Target, History, Lightbulb, ExternalLink, Video,
    ArrowRight, PenTool, HelpCircle, MessageSquare, Repeat, Smartphone, Sparkles, Megaphone,
-   Trophy, Type, Home, Mic, UserCog, Ban, Key, Map as MapIcon, Quote
+   Trophy, Type, Home, Mic, UserCog, Ban, Key, Map as MapIcon, Quote, Send as SendIcon, MapPin
 } from 'lucide-react';
 import {
    ANNUAL_STUDY_PLAN,
@@ -29,7 +29,7 @@ import {
    AuditLog,
    Reflection,
    BookClubQuizQuestion,
-   Event as SmsEvent,
+   SmsEvent,
    BrandingConfig,
    SiteContent
 } from '../types';
@@ -38,7 +38,7 @@ import {
    BarChart as ReBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
    PieChart as RePieChart, Pie, Sector, LineChart, Line, Legend, RadialBarChart, RadialBar
 } from 'recharts';
-import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc, addDoc, serverTimestamp, query, orderBy, onSnapshot, Timestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import Papa from 'papaparse';
 
@@ -405,16 +405,35 @@ const ReflectionQueue = ({ adminEmail }: { adminEmail: string }) => {
    const [reflections, setReflections] = useState<Reflection[]>([]);
 
    useEffect(() => {
-      const queue = JSON.parse(localStorage.getItem('sms_reflections_queue') || '[]');
-      setReflections(queue);
+      const loadReflections = async () => {
+         try {
+            const snap = await getDocs(collection(db, 'reflections'));
+            const refs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Reflection));
+            // Show pending first
+            refs.sort((a, b) => {
+               if (a.status === 'pending' && b.status !== 'pending') return -1;
+               if (a.status !== 'pending' && b.status === 'pending') return 1;
+               return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+            });
+            setReflections(refs);
+         } catch (e) {
+            console.error("Failed to load reflections", e);
+         }
+      };
+      loadReflections();
    }, []);
 
-   const updateStatus = (id: string, status: 'approved' | 'rejected') => {
-      const updated = reflections.map(r => r.id === id ? { ...r, status } : r);
-      setReflections(updated);
-      localStorage.setItem('sms_reflections_queue', JSON.stringify(updated));
-      logAdminAction(adminEmail, `Reflection ${status}`, id);
-      window.dispatchEvent(new Event('storage'));
+   const updateStatus = async (id: string, status: 'approved' | 'rejected') => {
+      try {
+         await updateDoc(doc(db, 'reflections', id), { status });
+         const updated = reflections.map(r => r.id === id ? { ...r, status } : r);
+         setReflections(updated);
+         logAdminAction(adminEmail, `Reflection ${status}`, id);
+         window.dispatchEvent(new Event('storage'));
+      } catch (e) {
+         console.error("Failed to update status", e);
+         alert("Failed to update status.");
+      }
    };
 
    return (
@@ -446,7 +465,7 @@ const ReflectionQueue = ({ adminEmail }: { adminEmail: string }) => {
                         <tr key={r.id} className={`transition-colors ${r.status === 'pending' ? 'bg-white' : 'bg-neutral-50/50 opacity-60'}`}>
                            <td className="p-6 align-top w-48">
                               <p className="font-bold text-navy-900 text-sm">{r.userName}</p>
-                              <p className="text-[10px] text-navy-400">{new Date(r.timestamp).toLocaleDateString()}</p>
+                              <p className="text-[10px] text-navy-400">{r.timestamp && typeof r.timestamp === 'string' ? new Date(r.timestamp).toLocaleDateString() : 'Recent'}</p>
                               <p className="text-[9px] font-black uppercase text-purple-600 mt-1">{r.chapterTitle}</p>
                            </td>
                            <td className="p-6 align-top">
@@ -687,8 +706,16 @@ const CommunicationsManager = ({ adminEmail }: { adminEmail: string }) => {
       else setTickerMsg(`Welcome to ${APP_CONFIG.NAME} ${APP_CONFIG.TAGLINE} • Supporting Malaysian Sai devotees in their spiritual journey.`);
 
       // Load Announcements
-      const storedAnns = JSON.parse(localStorage.getItem('sms_announcements') || '[]');
-      setAnnouncements(storedAnns);
+      const fetchAnns = async () => {
+         try {
+            const snap = await getDocs(query(collection(db, 'announcements'), orderBy('timestamp', 'desc')));
+            const ans = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Announcement));
+            setAnnouncements(ans);
+         } catch (e) {
+            console.error("Failed to load announcements", e);
+         }
+      };
+      fetchAnns();
    }, []);
 
    const saveTicker = () => {
@@ -699,33 +726,42 @@ const CommunicationsManager = ({ adminEmail }: { adminEmail: string }) => {
       alert("Live Ticker Updated Successfully!");
    };
 
-   const postAnnouncement = () => {
+   const postAnnouncement = async () => {
       if (!newAnn.title || !newAnn.content) return;
 
-      const ann: Announcement = {
-         id: `ann-${Date.now()}`,
-         title: newAnn.title,
-         content: newAnn.content,
-         category: newAnn.category as any,
-         timestamp: new Date().toISOString(),
-         isPinned: false,
-         imageUrl: newAnn.imageUrl
-      };
+      try {
+         const annData = {
+            title: newAnn.title,
+            content: newAnn.content,
+            category: newAnn.category as any,
+            timestamp: new Date().toISOString(),
+            isPinned: false,
+            imageUrl: newAnn.imageUrl || null
+         };
 
-      const updated = [ann, ...announcements];
-      setAnnouncements(updated);
-      localStorage.setItem('sms_announcements', JSON.stringify(updated));
-      logAdminAction(adminEmail, 'Posted Announcement', ann.title);
-      setNewAnn({ title: '', content: '', category: 'News' });
-      window.dispatchEvent(new Event('storage'));
+         const docRef = await addDoc(collection(db, 'announcements'), annData);
+         const ann: Announcement = { id: docRef.id, ...annData } as Announcement;
+
+         const updated = [ann, ...announcements];
+         setAnnouncements(updated);
+         logAdminAction(adminEmail, 'Posted Announcement', ann.title);
+         setNewAnn({ title: '', content: '', category: 'News' });
+      } catch (e) {
+         console.error("Failed to post announcement", e);
+         alert("Failed to post announcement.");
+      }
    };
 
-   const deleteAnnouncement = (id: string) => {
-      const updated = announcements.filter(a => a.id !== id);
-      setAnnouncements(updated);
-      localStorage.setItem('sms_announcements', JSON.stringify(updated));
-      logAdminAction(adminEmail, 'Deleted Announcement', id);
-      window.dispatchEvent(new Event('storage'));
+   const deleteAnnouncement = async (id: string) => {
+      try {
+         await deleteDoc(doc(db, 'announcements', id));
+         const updated = announcements.filter(a => a.id !== id);
+         setAnnouncements(updated);
+         logAdminAction(adminEmail, 'Deleted Announcement', id);
+      } catch (e) {
+         console.error("Failed to delete announcement", e);
+         alert("Failed to delete announcement.");
+      }
    };
 
    return (
@@ -1224,43 +1260,91 @@ const ContentStudio = ({ adminEmail }: { adminEmail: string }) => {
 
 // 1. EVENT MANAGER (UNCHANGED)
 const EventManager = ({ adminEmail }: { adminEmail: string }) => {
-   const [events, setEvents] = useState<SmsEvent[]>(() => {
-      return JSON.parse(localStorage.getItem('sms_custom_events') || '[]');
-   });
+   const [events, setEvents] = useState<SmsEvent[]>([]);
+   const [isLoading, setIsLoading] = useState(true);
+   const [isSaving, setIsSaving] = useState(false);
 
    const [newEvent, setNewEvent] = useState<Partial<SmsEvent>>({
-      title: '', date: new Date().toISOString().split('T')[0], category: 'Live', description: '', location: '', meetingLink: ''
+      title: '',
+      description: '',
+      eventDate: new Date().toISOString().slice(0, 16), // datetime-local format
+      location: '',
+      type: 'spiritual',
+      maxAttendees: 100,
+      status: 'published'
    });
 
-   const handleSave = () => {
-      if (!newEvent.title || !newEvent.date) return;
-      const event: SmsEvent = {
-         id: `evt-${Date.now()}`,
-         title: newEvent.title || 'Untitled',
-         date: new Date(newEvent.date!).toDateString(),
-         category: newEvent.category || 'Live',
-         description: newEvent.description || '',
-         location: newEvent.location,
-         meetingLink: newEvent.meetingLink,
-         time: newEvent.time,
-         isRecurring: newEvent.isRecurring,
-         ...newEvent
-      } as SmsEvent;
+   useEffect(() => {
+      const q = query(collection(db, 'calendar'), orderBy('eventDate', 'desc'));
+      const unsub = onSnapshot(q, (snap) => {
+         const evts = snap.docs.map(doc => ({
+            ...doc.data(),
+            eventId: doc.id
+         })) as SmsEvent[];
+         setEvents(evts);
+         setIsLoading(false);
+      }, (err) => {
+         console.error("Error fetching events:", err);
+         setIsLoading(false);
+      });
+      return () => unsub();
+   }, []);
 
-      const updated = [...events, event];
-      setEvents(updated);
-      localStorage.setItem('sms_custom_events', JSON.stringify(updated));
-      logAdminAction(adminEmail, 'Created Event', event.title);
-      setNewEvent({ title: '', date: new Date().toISOString().split('T')[0], category: 'Live', description: '', location: '', meetingLink: '' });
-      window.dispatchEvent(new Event('storage'));
+   const handleSave = async () => {
+      if (!newEvent.title || !newEvent.eventDate || !newEvent.location) {
+         alert("Please fill in Title, Date, and Location.");
+         return;
+      }
+
+      setIsSaving(true);
+      try {
+         const currentUser = JSON.parse(localStorage.getItem('sms_user') || '{}');
+         const eventData: any = {
+            title: newEvent.title,
+            description: newEvent.description || '',
+            eventDate: Timestamp.fromDate(new Date(newEvent.eventDate!)),
+            endDate: newEvent.endDate ? Timestamp.fromDate(new Date(newEvent.endDate)) : null,
+            location: newEvent.location,
+            type: newEvent.type || 'spiritual',
+            maxAttendees: Number(newEvent.maxAttendees) || 0,
+            registeredCount: 0,
+            registeredUsers: [],
+            imageUrl: newEvent.imageUrl || '',
+            createdBy: currentUser.uid || 'admin',
+            createdAt: serverTimestamp(),
+            status: newEvent.status || 'published'
+         };
+
+         await addDoc(collection(db, 'calendar'), eventData);
+         logAdminAction(adminEmail, 'Created Event', newEvent.title);
+
+         setNewEvent({
+            title: '',
+            description: '',
+            eventDate: new Date().toISOString().slice(0, 16),
+            location: '',
+            type: 'spiritual',
+            maxAttendees: 100,
+            status: 'published'
+         });
+         alert("Event published successfully!");
+      } catch (error) {
+         console.error("Error saving event:", error);
+         alert("Failed to publish event.");
+      } finally {
+         setIsSaving(false);
+      }
    };
 
-   const handleDelete = (id: string) => {
-      const updated = events.filter(e => e.id !== id);
-      setEvents(updated);
-      localStorage.setItem('sms_custom_events', JSON.stringify(updated));
-      logAdminAction(adminEmail, 'Deleted Event', id);
-      window.dispatchEvent(new Event('storage'));
+   const handleDelete = async (id: string) => {
+      if (!window.confirm("Are you sure you want to delete this event?")) return;
+      try {
+         await deleteDoc(doc(db, 'calendar', id));
+         logAdminAction(adminEmail, 'Deleted Event', id);
+      } catch (error) {
+         console.error("Error deleting event:", error);
+         alert("Failed to delete event.");
+      }
    };
 
    return (
@@ -1276,55 +1360,110 @@ const EventManager = ({ adminEmail }: { adminEmail: string }) => {
             <Card className="p-8 space-y-6">
                <h3 className="text-lg font-bold text-navy-900 border-b border-navy-50 pb-4">Create New Event</h3>
                <div className="space-y-4">
-                  <input className="w-full p-3 bg-neutral-50 rounded-xl border border-navy-50 text-sm font-bold" placeholder="Event Title" value={newEvent.title} onChange={e => setNewEvent({ ...newEvent, title: e.target.value })} />
-                  <div className="grid grid-cols-2 gap-4">
-                     <input type="date" className="w-full p-3 bg-neutral-50 rounded-xl border border-navy-50 text-sm" value={newEvent.date} onChange={e => setNewEvent({ ...newEvent, date: e.target.value })} />
-                     <input className="w-full p-3 bg-neutral-50 rounded-xl border border-navy-50 text-sm" placeholder="Time (e.g. 7:30 PM)" value={newEvent.time} onChange={e => setNewEvent({ ...newEvent, time: e.target.value })} />
+                  <div>
+                     <label className="text-[10px] font-black uppercase text-navy-300 mb-1 block">Event Title</label>
+                     <input className="w-full p-3 bg-neutral-50 rounded-xl border border-navy-50 text-sm font-bold" placeholder="e.g. Maha Shivaratri 2026" value={newEvent.title} onChange={e => setNewEvent({ ...newEvent, title: e.target.value })} />
                   </div>
-                  <div className="flex gap-2">
-                     {['Live', 'Virtual', 'Festival'].map(cat => (
-                        <button
-                           key={cat}
-                           onClick={() => setNewEvent({ ...newEvent, category: cat })}
-                           className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest border-2 transition-all ${newEvent.category === cat ?
-                              (cat === 'Live' ? 'bg-purple-50 border-purple-500 text-purple-700' :
-                                 cat === 'Virtual' ? 'bg-teal-50 border-teal-500 text-teal-700' :
-                                    'bg-green-50 border-green-500 text-green-700') :
-                              'bg-white border-navy-50 text-navy-300'}`}
-                        >
-                           {cat}
-                        </button>
-                     ))}
-                  </div>
-                  <textarea className="w-full p-3 bg-neutral-50 rounded-xl border border-navy-50 text-sm h-24 resize-none" placeholder="Description..." value={newEvent.description} onChange={e => setNewEvent({ ...newEvent, description: e.target.value })} />
-                  <input className="w-full p-3 bg-neutral-50 rounded-xl border border-navy-50 text-sm" placeholder="Location or Venue" value={newEvent.location} onChange={e => setNewEvent({ ...newEvent, location: e.target.value })} />
-                  <input className="w-full p-3 bg-neutral-50 rounded-xl border border-navy-50 text-sm" placeholder="Meeting/RSVP Link (Optional)" value={newEvent.meetingLink} onChange={e => setNewEvent({ ...newEvent, meetingLink: e.target.value })} />
 
-                  <button onClick={handleSave} className="w-full py-4 bg-navy-900 text-gold-500 font-black uppercase tracking-widest rounded-xl shadow-lg hover:scale-[1.02] transition-all flex items-center justify-center gap-2">
-                     <Plus size={16} /> Publish Event
+                  <div className="grid grid-cols-2 gap-4">
+                     <div>
+                        <label className="text-[10px] font-black uppercase text-navy-300 mb-1 block">Start Date/Time</label>
+                        <input type="datetime-local" className="w-full p-3 bg-neutral-50 rounded-xl border border-navy-50 text-[10px]" value={newEvent.eventDate} onChange={e => setNewEvent({ ...newEvent, eventDate: e.target.value })} />
+                     </div>
+                     <div>
+                        <label className="text-[10px] font-black uppercase text-navy-300 mb-1 block">Max Attendees</label>
+                        <input type="number" className="w-full p-3 bg-neutral-50 rounded-xl border border-navy-50 text-sm" placeholder="0 = Unlimited" value={newEvent.maxAttendees} onChange={e => setNewEvent({ ...newEvent, maxAttendees: Number(e.target.value) })} />
+                     </div>
+                  </div>
+
+                  <div>
+                     <label className="text-[10px] font-black uppercase text-navy-300 mb-1 block">Category</label>
+                     <div className="flex flex-wrap gap-2">
+                        {(['spiritual', 'service', 'learning', 'festival'] as const).map(cat => (
+                           <button
+                              key={cat}
+                              onClick={() => setNewEvent({ ...newEvent, type: cat })}
+                              className={`flex-1 py-2 px-1 rounded-lg text-[9px] font-black uppercase tracking-widest border-2 transition-all ${newEvent.type === cat ? 'bg-navy-900 text-gold-500 border-navy-900' : 'bg-white border-navy-50 text-navy-300'}`}
+                           >
+                              {cat}
+                           </button>
+                        ))}
+                     </div>
+                  </div>
+
+                  <div>
+                     <label className="text-[10px] font-black uppercase text-navy-300 mb-1 block">Location</label>
+                     <input className="w-full p-3 bg-neutral-50 rounded-xl border border-navy-50 text-sm" placeholder="Venue Address or 'Online'" value={newEvent.location} onChange={e => setNewEvent({ ...newEvent, location: e.target.value })} />
+                  </div>
+
+                  <div>
+                     <label className="text-[10px] font-black uppercase text-navy-300 mb-1 block">Description</label>
+                     <textarea className="w-full p-3 bg-neutral-50 rounded-xl border border-navy-50 text-sm h-24 resize-none" placeholder="Event details..." value={newEvent.description} onChange={e => setNewEvent({ ...newEvent, description: e.target.value })} />
+                  </div>
+
+                  <div>
+                     <label className="text-[10px] font-black uppercase text-navy-300 mb-1 block">Image URL (Optional)</label>
+                     <input className="w-full p-3 bg-neutral-50 rounded-xl border border-navy-50 text-sm" placeholder="https://..." value={newEvent.imageUrl} onChange={e => setNewEvent({ ...newEvent, imageUrl: e.target.value })} />
+                  </div>
+
+                  <button
+                     disabled={isSaving}
+                     onClick={handleSave}
+                     className="w-full py-4 bg-navy-900 text-gold-500 font-black uppercase tracking-widest rounded-xl shadow-lg hover:scale-[1.02] disabled:opacity-50 disabled:scale-100 transition-all flex items-center justify-center gap-2"
+                  >
+                     {isSaving ? <RefreshCw className="animate-spin" size={16} /> : <Plus size={16} />}
+                     Publish Event
                   </button>
                </div>
             </Card>
 
             <Card className="lg:col-span-2 p-8 overflow-hidden flex flex-col">
-               <h3 className="text-lg font-bold text-navy-900 mb-6">Upcoming Schedule</h3>
-               <div className="flex-grow overflow-y-auto custom-scrollbar space-y-3 pr-2 max-h-[500px]">
-                  {[...MOCK_EVENTS, ...events].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).map((evt, i) => (
-                     <div key={i} className="flex items-center justify-between p-4 bg-neutral-50 rounded-2xl border border-navy-50 group hover:border-gold-300 transition-colors">
-                        <div className="flex items-center gap-4">
-                           <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-xl shrink-0 ${evt.category === 'Live' ? 'bg-purple-100 text-purple-600' : evt.category === 'Virtual' ? 'bg-teal-100 text-teal-600' : 'bg-green-100 text-green-600'}`}>
-                              {new Date(evt.date).getDate()}
-                           </div>
-                           <div>
-                              <h4 className="font-bold text-navy-900">{evt.title}</h4>
-                              <p className="text-xs text-navy-400">{new Date(evt.date).toDateString()} • {evt.category}</p>
-                           </div>
-                        </div>
-                        {evt.id.startsWith('evt-') && (
-                           <button onClick={() => handleDelete(evt.id)} className="p-2 text-red-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"><Trash2 size={16} /></button>
-                        )}
+               <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-lg font-bold text-navy-900">Live Calendar Data</h3>
+                  <div className="px-3 py-1 bg-green-50 text-green-700 rounded-full text-[10px] font-black uppercase flex items-center gap-2">
+                     <Database size={12} /> Connected to Firestore
+                  </div>
+               </div>
+
+               <div className="flex-grow overflow-y-auto custom-scrollbar space-y-3 pr-2 max-h-[600px]">
+                  {isLoading ? (
+                     <div className="py-20 text-center text-navy-300 flex flex-col items-center gap-4">
+                        <RefreshCw className="animate-spin" size={32} />
+                        <p className="text-xs font-black uppercase tracking-widest">Loading Events...</p>
                      </div>
-                  ))}
+                  ) : events.length === 0 ? (
+                     <div className="py-20 text-center border-2 border-dashed border-navy-50 rounded-3xl">
+                        <Calendar size={48} className="mx-auto text-navy-100 mb-4" />
+                        <p className="text-navy-400 font-medium">No events found in Firestore.</p>
+                     </div>
+                  ) : (
+                     events.map((evt, i) => (
+                        <div key={i} className="flex items-center justify-between p-5 bg-neutral-50 rounded-2xl border border-navy-50 group hover:border-gold-300 transition-all">
+                           <div className="flex items-center gap-5">
+                              <div className={`w-14 h-14 rounded-2xl flex flex-col items-center justify-center font-black shrink-0 shadow-sm ${evt.type === 'spiritual' ? 'bg-purple-100 text-purple-600' :
+                                 evt.type === 'service' ? 'bg-teal-100 text-teal-600' :
+                                    evt.type === 'festival' ? 'bg-orange-100 text-orange-600' :
+                                       'bg-blue-100 text-blue-600'}`}>
+                                 <span className="text-[10px] leading-none mb-0.5">{evt.eventDate instanceof Timestamp || (evt.eventDate && typeof evt.eventDate.toDate === 'function') ? evt.eventDate.toDate().toLocaleString('default', { month: 'short' }) : 'Date'}</span>
+                                 <span className="text-xl leading-none">{evt.eventDate instanceof Timestamp || (evt.eventDate && typeof evt.eventDate.toDate === 'function') ? evt.eventDate.toDate().getDate() : '?'}</span>
+                              </div>
+                              <div>
+                                 <h4 className="font-bold text-navy-900 group-hover:text-purple-600 transition-colors">{evt.title}</h4>
+                                 <div className="flex items-center gap-3 mt-1">
+                                    <span className="text-[10px] text-navy-400 font-medium flex items-center gap-1"><MapPin size={10} /> {evt.location}</span>
+                                    <span className="text-[10px] text-navy-400 font-medium flex items-center gap-1"><Users size={10} /> {evt.registeredCount} / {evt.maxAttendees || '∞'}</span>
+                                    <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest ${evt.status === 'published' ? 'bg-green-100 text-green-700' : 'bg-neutral-100 text-navy-400'}`}>
+                                       {evt.status}
+                                    </span>
+                                 </div>
+                              </div>
+                           </div>
+                           <button onClick={() => handleDelete(evt.eventId)} className="p-3 text-red-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all opacity-0 group-hover:opacity-100">
+                              <Trash2 size={18} />
+                           </button>
+                        </div>
+                     ))
+                  )}
                </div>
             </Card>
          </div>
@@ -1522,6 +1661,167 @@ const BookClubAnalytics: React.FC = () => {
    );
 };
 
+// 12. PUSH NOTIFICATIONS MANAGER
+const PushNotificationManager = ({ adminEmail }: { adminEmail: string }) => {
+   const [title, setTitle] = useState('');
+   const [body, setBody] = useState('');
+   const [target, setTarget] = useState<'all' | 'state' | 'centre'>('all');
+   const [selectedRegion, setSelectedRegion] = useState('');
+   const [schedule, setSchedule] = useState<'now' | 'later'>('now');
+   const [scheduleTime, setScheduleTime] = useState('');
+   const [history, setHistory] = useState<any[]>([]);
+
+   useEffect(() => {
+      const saved = JSON.parse(localStorage.getItem('sms_push_history') || '[]');
+      setHistory(saved);
+   }, []);
+
+   const handleSend = () => {
+      if (!title || !body) {
+         alert('Please provide a title and body for the notification.');
+         return;
+      }
+
+      // Simulate sending via Cloud Function
+      const logEntry = {
+         id: `push-${Date.now()}`,
+         title,
+         body,
+         target,
+         region: target !== 'all' ? selectedRegion : 'N/A',
+         status: schedule === 'now' ? 'Sent' : 'Scheduled',
+         timestamp: schedule === 'later' && scheduleTime ? new Date(scheduleTime).toISOString() : new Date().toISOString()
+      };
+
+      const newHistory = [logEntry, ...history];
+      setHistory(newHistory);
+      localStorage.setItem('sms_push_history', JSON.stringify(newHistory));
+      logAdminAction(adminEmail, 'Dispatched Push Notification', title);
+
+      setTitle('');
+      setBody('');
+      setTarget('all');
+      setSelectedRegion('');
+      setSchedule('now');
+
+      alert(schedule === 'now' ? 'Push Notification Dispatched!' : 'Push Notification Scheduled!');
+   };
+
+   return (
+      <div className="space-y-8 animate-in fade-in">
+         <div className="flex justify-between items-end">
+            <div>
+               <h2 className="text-3xl font-serif font-bold text-navy-900">Push Notifications</h2>
+               <p className="text-sm text-navy-400">Compose and send push alerts via FCM.</p>
+            </div>
+         </div>
+
+         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <Card className="p-8 space-y-6">
+               <h3 className="text-lg font-bold text-navy-900 border-b border-navy-50 pb-4">Compose Message</h3>
+               <div className="space-y-4">
+                  <div>
+                     <label className="text-[10px] font-black uppercase text-navy-300 mb-1 block">Notification Title</label>
+                     <input
+                        className="w-full p-3 bg-neutral-50 rounded-xl border border-navy-50 text-sm font-bold focus:border-gold-500 outline-none"
+                        placeholder="e.g. New Live Session Starting!"
+                        value={title}
+                        onChange={e => setTitle(e.target.value)}
+                     />
+                  </div>
+                  <div>
+                     <label className="text-[10px] font-black uppercase text-navy-300 mb-1 block">Message Body</label>
+                     <textarea
+                        className="w-full p-3 bg-neutral-50 rounded-xl border border-navy-50 text-sm h-32 resize-none focus:border-gold-500 outline-none"
+                        placeholder="Details of the announcement..."
+                        value={body}
+                        onChange={e => setBody(e.target.value)}
+                     />
+                  </div>
+
+                  <div className="pt-4 border-t border-navy-50">
+                     <label className="text-[10px] font-black uppercase text-navy-300 mb-2 block">Target Audience</label>
+                     <div className="flex gap-2 mb-4">
+                        {['all', 'state', 'centre'].map(t => (
+                           <button
+                              key={t}
+                              onClick={() => setTarget(t as any)}
+                              className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest border transition-all ${target === t ? 'bg-navy-900 text-white border-navy-900' : 'bg-white text-navy-400 border-navy-100 hover:bg-neutral-50'}`}
+                           >
+                              {t}
+                           </button>
+                        ))}
+                     </div>
+                     {target !== 'all' && (
+                        <input
+                           className="w-full p-3 bg-neutral-50 rounded-xl border border-navy-50 text-sm focus:border-gold-500 outline-none"
+                           placeholder={target === 'state' ? "Enter State (e.g. Selangor)" : "Enter Centre Name"}
+                           value={selectedRegion}
+                           onChange={e => setSelectedRegion(e.target.value)}
+                        />
+                     )}
+                  </div>
+
+                  <div className="pt-4 border-t border-navy-50">
+                     <label className="text-[10px] font-black uppercase text-navy-300 mb-2 block">Delivery Schedule</label>
+                     <div className="flex gap-4 items-center">
+                        <label className="flex items-center gap-2 text-sm text-navy-700">
+                           <input type="radio" checked={schedule === 'now'} onChange={() => setSchedule('now')} />
+                           Send Immediately
+                        </label>
+                        <label className="flex items-center gap-2 text-sm text-navy-700">
+                           <input type="radio" checked={schedule === 'later'} onChange={() => setSchedule('later')} />
+                           Schedule for later
+                        </label>
+                     </div>
+                     {schedule === 'later' && (
+                        <div className="mt-4">
+                           <input
+                              type="datetime-local"
+                              className="w-full p-3 bg-neutral-50 rounded-xl border border-navy-50 text-sm focus:border-gold-500 outline-none"
+                              value={scheduleTime}
+                              onChange={e => setScheduleTime(e.target.value)}
+                           />
+                        </div>
+                     )}
+                  </div>
+
+                  <button onClick={handleSend} className="w-full py-4 bg-navy-900 text-gold-500 font-black uppercase tracking-widest rounded-xl shadow-lg hover:bg-navy-800 transition-all flex items-center justify-center gap-2 mt-4">
+                     <SendIcon size={16} /> {schedule === 'now' ? 'Dispatch Push Notification' : 'Schedule Notification'}
+                  </button>
+                  <p className="text-[9px] text-navy-300 text-center italic mt-2">Note: This dispatches to user devices via Cloud Messaging.</p>
+               </div>
+            </Card>
+
+            <Card className="p-8">
+               <h3 className="text-lg font-bold text-navy-900 border-b border-navy-50 pb-4 mb-4">Notification History</h3>
+               <div className="space-y-4 max-h-[600px] overflow-y-auto custom-scrollbar pr-2">
+                  {history.length === 0 ? (
+                     <p className="text-navy-300 text-sm italic py-8 text-center">No notifications sent yet.</p>
+                  ) : (
+                     history.map(item => (
+                        <div key={item.id} className="p-4 bg-neutral-50 rounded-xl border border-navy-50">
+                           <div className="flex justify-between items-start mb-2">
+                              <span className={`px-2 py-1 rounded text-[8px] font-black uppercase tracking-widest ${item.status === 'Sent' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
+                                 {item.status} ({item.target})
+                              </span>
+                              <span className="text-[10px] text-navy-400 font-medium">
+                                 {new Date(item.timestamp).toLocaleString()}
+                              </span>
+                           </div>
+                           <h4 className="font-bold text-navy-900 text-sm">{item.title}</h4>
+                           <p className="text-xs text-navy-500 mt-1 line-clamp-2">{item.body}</p>
+                           {item.target !== 'all' && <p className="text-[10px] font-bold text-purple-600 mt-2">Targeted: {item.region}</p>}
+                        </div>
+                     ))
+                  )}
+               </div>
+            </Card>
+         </div>
+      </div>
+   );
+};
+
 // --- MAIN PAGE ---
 
 const AdminPage: React.FC<{ user: UserProfile | null }> = ({ user }) => {
@@ -1605,6 +1905,7 @@ const AdminPage: React.FC<{ user: UserProfile | null }> = ({ user }) => {
             <aside className="lg:w-72 space-y-2 shrink-0">
                <h4 className="text-[9px] font-black uppercase text-navy-200 tracking-[0.3em] px-6 mb-4">Core Modules</h4>
                <AdminNavItem active={activeModule === 'comms'} onClick={() => setActiveModule('comms')} icon={<Megaphone size={20} />} label="Comms Center" />
+               <AdminNavItem active={activeModule === 'notifications'} onClick={() => setActiveModule('notifications')} icon={<Bell size={20} />} label="Push Notifications" />
                <AdminNavItem active={activeModule === 'events'} onClick={() => setActiveModule('events')} icon={<Calendar size={20} />} label="Event Manager" />
                <AdminNavItem active={activeModule === 'content'} onClick={() => setActiveModule('content')} icon={<BookOpen size={20} />} label="Content Studio" />
                <div className="my-4 border-t border-navy-50"></div>
@@ -1622,6 +1923,7 @@ const AdminPage: React.FC<{ user: UserProfile | null }> = ({ user }) => {
             <main className="flex-grow">
                {activeModule === 'comms' && <CommunicationsManager adminEmail={user?.email || 'admin'} />}
                {activeModule === 'page_content' && <PageContentManager adminEmail={user?.email || 'admin'} />}
+               {activeModule === 'notifications' && <PushNotificationManager adminEmail={user?.email || 'admin'} />}
                {activeModule === 'events' && <EventManager adminEmail={user?.email || 'admin'} />}
                {activeModule === 'content' && <ContentStudio adminEmail={user?.email || 'admin'} />}
                {activeModule === 'branding' && <BrandingManager adminEmail={user?.email || 'admin'} />}

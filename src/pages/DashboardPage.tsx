@@ -1,93 +1,115 @@
 
 import React, { useState, useEffect } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
-import { Heart, BookOpen, Activity, Award, Trophy, Medal, Lock, ArrowRight, Check, Shield, Briefcase, FileText, CheckCircle2, Sparkles, PartyPopper } from 'lucide-react';
-import { Link, useLocation } from 'react-router-dom';
+import { Heart, BookOpen, Activity, Award, Trophy, Medal, Lock, ArrowRight, Check, Shield, Briefcase, FileText, CheckCircle2, Sparkles, PartyPopper, Users, Target, Mic, Flame } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import SaiAvatar from '../components/SaiAvatar';
-import { UserBriefcaseItem } from '../types';
+import { UserBriefcaseItem, UserProfile } from '../types';
 import { ToastContainer, useToast } from '../components/Toast';
 import confetti from 'canvas-confetti';
 import Skeleton from '../components/Skeleton';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import { subscribeToNationalStats, NationalStats } from '../lib/nationalStats';
 
 const DashboardPage: React.FC = () => {
-  const [user, setUser] = useState<any>(null);
-  const [stats, setStats] = useState({ gayathri: 0, saiGayathri: 0, likitha: 0, mantras: 0, booksRead: 0 });
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [stats, setStats] = useState({
+    gayathri: 0,
+    saiGayathri: 0,
+    likitha: 0,
+    mantras: 0,
+    booksRead: 0,
+    streak: 0
+  });
+  const [nationalStats, setNationalStats] = useState<NationalStats | null>(null);
   const [completedWeeks, setCompletedWeeks] = useState<string[]>([]);
   const [badges, setBadges] = useState<any[]>([]);
   const [briefcase, setBriefcase] = useState<UserBriefcaseItem[]>([]);
   const location = useLocation();
+  const navigate = useNavigate();
   const { toasts, showToast, closeToast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Override scroll anchor jump
     window.scrollTo(0, 0);
-    const id = setTimeout(() => window.scrollTo(0, 0), 10);
-    return () => clearTimeout(id);
   }, []);
 
   useEffect(() => {
-    const saved = localStorage.getItem('sms_user');
-    if (saved) {
-      const userData = JSON.parse(saved);
-      setUser(userData);
+    const savedProfile = localStorage.getItem('sms_user');
+    if (!savedProfile) return;
 
-      if (!userData.isGuest) {
-        const localStats = JSON.parse(localStorage.getItem(`sms_stats_${userData.uid}`) || '{"gayathri":0, "saiGayathri":0, "likitha":0, "mantras":0}');
+    const initialUser = JSON.parse(savedProfile) as UserProfile;
+    setUser(initialUser);
+
+    if (initialUser.isGuest) {
+      navigate('/?guest_redirect=true');
+      return;
+    }
+
+    // 1. Real-time User Profile & Stats Subscription
+    const userRef = doc(db, 'users', initialUser.uid);
+    const unsubUser = onSnapshot(userRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const userData = docSnap.data() as UserProfile;
+        setUser(userData);
+
+        const localStats = JSON.parse(localStorage.getItem(`sms_stats_${initialUser.uid}`) || '{"gayathri":0, "saiGayathri":0, "likitha":0, "mantras":0}');
         const fbStats = userData.stats || { gayathri: 0, saiGayathri: 0, likitha: 0, mantras: 0 };
-        const mergedStats = {
+
+        const currentCompletions = JSON.parse(localStorage.getItem(`sms_completions`) || '[]');
+
+        setStats({
           gayathri: Math.max(localStats.gayathri || 0, fbStats.gayathri || 0),
           saiGayathri: Math.max(localStats.saiGayathri || 0, fbStats.saiGayathri || 0),
           likitha: Math.max(localStats.likitha || 0, fbStats.likitha || 0),
-          mantras: Math.max(localStats.mantras || 0, fbStats.mantras || 0)
-        };
-        const compWeeks = JSON.parse(localStorage.getItem(`sms_completions`) || '[]');
-        const userBadges = JSON.parse(localStorage.getItem(`sms_badges`) || '[]');
-        const userBriefcase = JSON.parse(localStorage.getItem(`sms_briefcase_${userData.uid}`) || '[]');
+          mantras: Math.max(localStats.mantras || 0, fbStats.mantras || 0),
+          streak: (userData as any).streak || 0,
+          booksRead: currentCompletions.length
+        });
 
-        setStats({ ...mergedStats, booksRead: compWeeks.length });
-        setCompletedWeeks(compWeeks);
-        setBadges(userBadges);
-        setBriefcase(userBriefcase.reverse()); // Newest first
+        setIsLoading(false);
       }
-    }
+    }, (err) => {
+      console.error("Dashboard User Snapshot Error:", err);
+      setIsLoading(false);
+    });
+
+    // 2. National Stats Subscription
+    const unsubNational = subscribeToNationalStats((newStats) => {
+      setNationalStats(newStats);
+    });
+
+    // 3. Load other local data
+    const compWeeks = JSON.parse(localStorage.getItem(`sms_completions`) || '[]');
+    const userBadges = JSON.parse(localStorage.getItem(`sms_badges`) || '[]');
+    const userBriefcase = JSON.parse(localStorage.getItem(`sms_briefcase_${initialUser.uid}`) || '[]');
+
+    setCompletedWeeks(compWeeks);
+    setBadges(userBadges);
+    setBriefcase(userBriefcase.reverse());
 
     // Check for welcome toasts
     const showNewWelcome = sessionStorage.getItem('sms_show_welcome') === 'new_user' || location.state?.isNew;
     const showReturningWelcome = sessionStorage.getItem('sms_show_welcome') === 'returning_user' || location.state?.isReturning;
 
-    if (showNewWelcome && saved) {
-      const userData = JSON.parse(saved);
-      const name = userData.name?.split(' ')[0] || 'Devotee';
-      const title = userData.gender === 'female' ? 'Sis' : 'Bro';
-
-      confetti({
-        particleCount: 100,
-        spread: 70,
-        origin: { y: 0.6 },
-        colors: ['#D4AF37', '#FFD700', '#FFF8DC']
-      });
-
-      setTimeout(() => {
-        showToast(`Welcome to Sai SMS, ${title} ${name}! Om Sai Ram!`, 'success', 5000);
-      }, 500);
-
+    if (showNewWelcome) {
+      const name = initialUser.name?.split(' ')[0] || 'Devotee';
+      const title = initialUser.gender === 'female' ? 'Sis' : 'Bro';
+      confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 }, colors: ['#D4AF37', '#FFD700'] });
+      setTimeout(() => showToast(`Welcome to Sai SMS, ${title} ${name}! Om Sai Ram!`, 'success', 5000), 500);
       sessionStorage.removeItem('sms_show_welcome');
-    } else if (showReturningWelcome && saved) {
-      const userData = JSON.parse(saved);
-      const name = userData.name?.split(' ')[0] || 'Devotee';
-      const title = userData.gender === 'female' ? 'Sis' : 'Bro';
-
-      setTimeout(() => {
-        showToast(`Om Sai Ram, ${title} ${name}! Welcome back.`, 'info', 4000);
-      }, 500);
-
+    } else if (showReturningWelcome) {
+      const name = initialUser.name?.split(' ')[0] || 'Devotee';
+      const title = initialUser.gender === 'female' ? 'Sis' : 'Bro';
+      setTimeout(() => showToast(`Om Sai Ram, ${title} ${name}! Welcome back.`, 'info', 4000), 500);
       sessionStorage.removeItem('sms_show_welcome');
     }
 
-    // Simulate async loading for skeleton demo
-    const loadId = setTimeout(() => setIsLoading(false), 600);
-    return () => clearTimeout(loadId);
+    return () => {
+      unsubUser();
+      unsubNational();
+    };
   }, [location.state]);
 
   const chartData = [
@@ -125,7 +147,7 @@ const DashboardPage: React.FC = () => {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-16 space-y-12 relative">
+    <div className="max-w-7xl mx-auto px-4 py-16 space-y-12 relative animate-in fade-in duration-500">
       <ToastContainer toasts={toasts} onClose={closeToast} />
 
       {user?.isGuest && (
@@ -139,6 +161,7 @@ const DashboardPage: React.FC = () => {
           </Link>
         </div>
       )}
+
       <div className="flex flex-col md:flex-row justify-between items-end gap-6 text-center md:text-left">
         <div className="flex items-center gap-6">
           <div className="hidden md:block p-1 bg-gold-gradient rounded-full shadow-lg">
@@ -149,7 +172,16 @@ const DashboardPage: React.FC = () => {
             <p className="text-navy-500 font-medium">Om Sai Ram, {user?.gender === 'female' ? 'Sis.' : 'Bro.'} {user?.name?.replace(/^(Sis|Bro|Brother|Sister)\.?\s+/i, '').split(' ')[0] || user?.name}. Your sacred growth in 2026.</p>
           </div>
         </div>
-        <div className="flex flex-col items-end gap-2">
+
+        <div className="flex gap-4">
+          <div className="bg-orange-500 text-white px-6 py-3 rounded-3xl flex items-center gap-3 shadow-lg shadow-orange-500/20 animate-bounce-subtle">
+            <Flame size={20} className="fill-current" />
+            <div className="text-left">
+              <span className="block text-[8px] font-black uppercase tracking-widest opacity-70">Daily Streak</span>
+              <span className="text-lg font-black">{stats.streak} Days</span>
+            </div>
+          </div>
+
           <div className="bg-white/50 backdrop-blur border border-navy-50 p-4 rounded-3xl flex items-center gap-3">
             <Award size={20} className="text-gold-500" />
             <div className="text-left">
@@ -159,6 +191,33 @@ const DashboardPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* National Quick View */}
+      {nationalStats && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-navy-900 p-6 rounded-3xl text-white flex items-center gap-6 group hover:translate-y-[-2px] transition-all">
+            <div className="p-4 bg-white/10 rounded-2xl group-hover:scale-110 transition-transform"><Users size={24} className="text-gold-500" /></div>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-navy-300">National Participants</p>
+              <p className="text-2xl font-black">{nationalStats.totalParticipants.toLocaleString()}</p>
+            </div>
+          </div>
+          <div className="bg-[#bf0449] p-6 rounded-3xl text-white flex items-center gap-6 group hover:translate-y-[-2px] transition-all">
+            <div className="p-4 bg-white/10 rounded-2xl group-hover:scale-110 transition-transform"><Mic size={24} className="text-white" /></div>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-white/70">Total National Chants</p>
+              <p className="text-2xl font-black">{nationalStats.totalChants.toLocaleString()}</p>
+            </div>
+          </div>
+          <div className="bg-[#009688] p-6 rounded-3xl text-white flex items-center gap-6 group hover:translate-y-[-2px] transition-all">
+            <div className="p-4 bg-white/10 rounded-2xl group-hover:scale-110 transition-transform"><Target size={24} className="text-white" /></div>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-white/70">National Goal Progress</p>
+              <p className="text-2xl font-black">{nationalStats.goalPercent}%</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
         <div className="lg:col-span-2 space-y-8">
@@ -224,45 +283,6 @@ const DashboardPage: React.FC = () => {
               )}
             </div>
           </div>
-
-          {/* AC-WS-P3: WordSearch Gems Shelf */}
-          <div className="bg-white p-10 rounded-bento shadow-xl border border-navy-50">
-            <div className="flex items-center justify-between mb-8">
-              <div className="flex items-center gap-4">
-                <Link to="/games" className="p-3 bg-gold-gradient text-navy-900 rounded-2xl hover:scale-105 transition-transform"><Sparkles size={24} /></Link>
-                <div>
-                  <h3 className="text-2xl font-serif font-bold text-navy-900">WordSearch Gems</h3>
-                  <p className="text-xs text-navy-400 font-bold uppercase tracking-widest">Divine Wisdom Collected</p>
-                </div>
-              </div>
-              <div className="bg-navy-50 px-4 py-2 rounded-xl">
-                <span className="text-[10px] font-black uppercase text-navy-300 block">Total Gems</span>
-                <span className="text-xl font-black text-navy-900">{briefcase.filter(i => i.type === 'word_card').length} / 30</span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-              {briefcase.filter(i => i.type === 'word_card').length === 0 ? (
-                <div className="col-span-full text-center py-10 bg-neutral-50 rounded-3xl border-2 border-dashed border-navy-100">
-                  <p className="text-sm font-medium text-navy-500 mb-6">No divine gems collected yet. Find them in the Word Search!</p>
-                  <Link to="/games" className="inline-block px-6 py-2.5 bg-gold-gradient text-navy-900 rounded-full text-[10px] font-black uppercase tracking-widest hover:scale-105 transition-transform shadow-lg">Play Word Search</Link>
-                </div>
-              ) : (
-                briefcase.filter(i => i.type === 'word_card').slice(0, 8).map(gem => (
-                  <div key={gem.id} className="p-4 bg-navy-900 rounded-2xl text-center group hover:scale-105 transition-all shadow-lg border border-gold-500/20">
-                    <div className="w-10 h-10 bg-gold-gradient rounded-full flex items-center justify-center mx-auto mb-2 text-[#002E5B] shadow-inner">
-                      <Sparkles size={16} />
-                    </div>
-                    <p className="text-[10px] font-black text-gold-500 uppercase tracking-tighter truncate">{gem.title}</p>
-                  </div>
-                ))
-              )}
-            </div>
-            {briefcase.filter(i => i.type === 'word_card').length > 8 && (
-              <p className="text-center mt-6 text-[10px] font-black uppercase text-navy-300 tracking-[0.2em]">View more in your Briefcase above</p>
-            )}
-          </div>
-
         </div>
 
         {/* Sidebar: Badges & Summary */}
@@ -308,6 +328,19 @@ const DashboardPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <style>{`
+        @keyframes bounce-subtle {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-4px); }
+        }
+        .animate-bounce-subtle {
+            animation: bounce-subtle 2s ease-in-out infinite;
+        }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f0f4f8; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #d2ac47; border-radius: 10px; }
+      `}</style>
     </div>
   );
 };

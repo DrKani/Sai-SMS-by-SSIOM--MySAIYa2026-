@@ -58,7 +58,7 @@ service cloud.firestore {
 
     // --- Sadhana Daily ---
     match /sadhanaDaily/{docId} {
-      allow read: if request.auth != null && (resource.data.uid == request.auth.uid || isAdmin());
+      allow read: if request.auth != null && (resource.data.uid == request.auth.uid || isAdmin() || resource.data.publicLeaderboard == true);
       allow create: if request.auth != null 
                     && request.resource.data.uid == request.auth.uid;
       allow update: if request.auth != null 
@@ -74,6 +74,20 @@ service cloud.firestore {
     match /bookclubWeeks/{docId} {
       allow read: if request.auth != null;
       allow write: if isAdmin();
+    }
+
+    // --- Reflections ---
+    match /reflections/{docId} {
+      allow read: if request.auth != null && (resource.data.status == 'approved' || resource.data.uid == request.auth.uid || isAdmin());
+      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
+      allow update: if isAdmin();
+      allow delete: if request.auth != null && (resource.data.uid == request.auth.uid || isAdmin());
+    }
+
+    // --- Notifications ---
+    match /notifications/{notificationId} {
+      allow read: if request.auth != null && resource.data.uid == request.auth.uid;
+      allow write: if false; // Only Cloud Functions can write
     }
   }
 }

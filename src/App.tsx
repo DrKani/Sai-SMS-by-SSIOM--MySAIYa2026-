@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { onAuthStateChanged, signOut, sendEmailVerification, User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, onSnapshot, collection, query, where, orderBy, writeBatch } from 'firebase/firestore';
 import { auth, db } from './lib/firebase';
 import TutorialOverlay, { TutorialStep } from './components/TutorialOverlay';
 import {
@@ -9,7 +9,7 @@ import {
   MapPin, ShieldCheck, UserCircle,
   Home, ArrowUp, Phone, LogIn,
   Megaphone, Calendar, Sparkles, CheckCheck,
-  Library, Gamepad2, Heart, MessageSquare, Activity, Loader2,
+  Library, Gamepad2, Heart, MessageSquare, Activity, Loader2, Trophy,
   ExternalLink,
   MessageCircle,
   Globe,
@@ -27,7 +27,7 @@ import {
   Music
 } from 'lucide-react';
 
-import { UserProfile, Announcement, BrandingConfig, SiteContent } from './types';
+import { UserProfile, Announcement, BrandingConfig, SiteContent, AppNotification } from './types';
 import { ANNUAL_STUDY_PLAN, APP_CONFIG, ADMIN_CONFIG, DEFAULT_SITE_CONTENT } from './constants';
 
 import NotificationDrawer from './components/NotificationDrawer';
@@ -40,6 +40,8 @@ import NotificationBell from './components/NotificationBell';
 import MultiFunctionFAB from './components/MultiFunctionFAB';
 import EnhancedTickerBar from './components/EnhancedTickerBar';
 import Footer from './components/Footer';
+import OfflineBanner from './components/OfflineBanner';
+import { usePushNotifications } from './hooks/usePushNotifications';
 
 // Lazy load pages
 const HomePage = lazy(() => import('./pages/HomePage'));
@@ -54,13 +56,18 @@ const SignupPage = lazy(() => import('./pages/SignupPage'));
 const SetupPage = lazy(() => import('./pages/SetupPage'));
 const AnnouncementsPage = lazy(() => import('./pages/AnnouncementsPage'));
 const JournalPage = lazy(() => import('./pages/JournalPage'));
+const LeaderboardPage = lazy(() => import('./pages/LeaderboardPage'));
 const CalendarPage = lazy(() => import('./pages/CalendarPage'));
 const TermsOfUse = lazy(() => import('./pages/TermsOfUse'));
 const CookiePolicy = lazy(() => import('./pages/CookiePolicy'));
 const Copyright = lazy(() => import('./pages/Copyright'));
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
 const CommunityGuidelines = lazy(() => import('./pages/CommunityGuidelines'));
 const ContentSubmissionGuidelines = lazy(() => import('./pages/ContentSubmissionGuidelines'));
+const EventsPage = lazy(() => import('./pages/EventsPage'));
+const EventDetailPage = lazy(() => import('./pages/EventDetailPage'));
+const ContactPage = lazy(() => import('./pages/ContactPage'));
 
 const PageLoader = () => (
   <div className="flex-grow flex items-center justify-center min-h-[60vh]">
@@ -71,9 +78,15 @@ const PageLoader = () => (
   </div>
 );
 
-const ProtectedRoute = ({ children, user }: { children: React.ReactNode, user: UserProfile | null }) => {
+const ProtectedRoute = ({ children, user, allowGuest = false }: { children: React.ReactNode, user: UserProfile | null, allowGuest?: boolean }) => {
   const location = useLocation();
-  if (!user) return <Navigate to="/signin" replace />;
+  if (!user) return <Navigate to="/signin" state={{ from: location }} replace />;
+
+  // Block guests from non-guest pages
+  if (user.isGuest && !allowGuest) {
+    return <Navigate to="/signup" state={{ from: location, message: "Sign up to unlock this feature!" }} replace />;
+  }
+
   const isEffectivelyOnboarded = user.onboardingDone || (!!user.name && user.name !== 'Devotee' && !!user.state);
   if (!isEffectivelyOnboarded && location.pathname !== '/setup' && !user.isGuest) return <Navigate to="/setup" replace />;
   if (isEffectivelyOnboarded && location.pathname === '/setup' && !user.isGuest) return <Navigate to="/dashboard" replace />;
@@ -158,39 +171,61 @@ const Layout: React.FC = () => {
   });
   const [isAuthChecking, setIsAuthChecking] = useState(() => !localStorage.getItem('sms_user'));
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [readNotifIds, setReadNotifIds] = useState<string[]>(() => {
-    const saved = localStorage.getItem('sms_read_notifications');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const { permissionStatus, requestPermission } = usePushNotifications(user);
 
   useEffect(() => {
+    let profileUnsubscribe: (() => void) | null = null;
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (profileUnsubscribe) {
+        profileUnsubscribe();
+        profileUnsubscribe = null;
+      }
+
       if (firebaseUser) {
         try {
           const docRef = doc(db, 'users', firebaseUser.uid);
-          const docSnap = await getDoc(docRef);
-          let profileData: Partial<UserProfile> = docSnap.exists() ? docSnap.data() as UserProfile : {};
-          const adminEmail = firebaseUser.email?.toLowerCase();
-          const isAdminUser = adminEmail && ADMIN_CONFIG.AUTHORIZED_EMAILS.includes(adminEmail);
-          const profile: UserProfile = {
-            uid: firebaseUser.uid,
-            name: profileData.name || firebaseUser.displayName || 'Devotee',
-            email: firebaseUser.email || '',
-            photoURL: profileData.photoURL || firebaseUser.photoURL || APP_CONFIG.AVATAR_MALE,
-            joinedAt: profileData.joinedAt || new Date().toISOString(),
-            isGuest: firebaseUser.isAnonymous,
-            isAdmin: !!isAdminUser,
-            onboardingDone: !!profileData.onboardingDone,
-            onboardedApp: !!profileData.onboardedApp,
-            state: profileData.state || '',
-            centre: profileData.centre || '',
-            ...profileData
-          };
-          setUser(profile);
-          localStorage.setItem('sms_user', JSON.stringify(profile));
-          if (!profile.onboardedApp && !profile.isGuest) setTimeout(() => setShowAppTutorial(true), 1500);
+
+          // SEC-04: Admin routes protected by Firebase custom claims AND client-side guard
+          let claims: any = {};
+          try {
+            const tokenResult = await firebaseUser.getIdTokenResult();
+            claims = tokenResult.claims;
+          } catch (e) {
+            console.error("Custom claims fetch error", e);
+          }
+
+          // Use onSnapshot for real-time profile updates (streaks, badges, etc.)
+          profileUnsubscribe = onSnapshot(docRef, (docSnap) => {
+            let profileData: Partial<UserProfile> = docSnap.exists() ? docSnap.data() as UserProfile : {};
+            const adminEmail = firebaseUser.email?.toLowerCase();
+            const isAdminUser = claims.admin || profileData.isAdmin || (adminEmail && ADMIN_CONFIG.AUTHORIZED_EMAILS.includes(adminEmail));
+            const profile: UserProfile = {
+              uid: firebaseUser.uid,
+              name: profileData.name || firebaseUser.displayName || 'Devotee',
+              email: firebaseUser.email || '',
+              photoURL: profileData.photoURL || firebaseUser.photoURL || APP_CONFIG.AVATAR_MALE,
+              joinedAt: profileData.joinedAt || new Date().toISOString(),
+              isGuest: firebaseUser.isAnonymous,
+              isAdmin: !!isAdminUser,
+              onboardingDone: !!profileData.onboardingDone,
+              onboardedApp: !!profileData.onboardedApp,
+              state: profileData.state || '',
+              centre: profileData.centre || '',
+              ...profileData
+            };
+            setUser(profile);
+            localStorage.setItem('sms_user', JSON.stringify(profile));
+
+            // Show tutorial if not done
+            if (!profile.onboardedApp && !profile.isGuest && !showAppTutorial) {
+              setTimeout(() => setShowAppTutorial(true), 1500);
+            }
+          }, (error) => {
+            console.error("Profile snapshot error:", error);
+          });
         } catch (error) {
-          console.error("Error fetching user profile:", error);
+          console.error("Error setting up profile snapshot:", error);
           setUser({ uid: firebaseUser.uid, name: firebaseUser.displayName || 'Devotee', email: firebaseUser.email || '', photoURL: firebaseUser.photoURL || APP_CONFIG.AVATAR_MALE, joinedAt: new Date().toISOString(), isGuest: firebaseUser.isAnonymous, isAdmin: false, state: '', onboardingDone: false, centre: '' });
         }
       } else {
@@ -209,8 +244,6 @@ const Layout: React.FC = () => {
       if (brand) setBranding(JSON.parse(brand));
       const msg = localStorage.getItem('sms_ticker_message');
       if (msg) setTickerMessage(msg);
-      const anns = JSON.parse(localStorage.getItem('sms_announcements') || '[]');
-      setAnnouncements(anns);
       const content = localStorage.getItem('sms_site_content');
       if (content) setSiteContent(JSON.parse(content));
     };
@@ -219,13 +252,43 @@ const Layout: React.FC = () => {
     const handleScroll = () => setShowScrollTop(window.scrollY > 400);
     window.addEventListener('scroll', handleScroll);
     window.addEventListener('storage', refreshData);
+
+    const unsubAnnouncements = onSnapshot(
+      query(collection(db, 'announcements'), orderBy('timestamp', 'desc')),
+      (snapshot) => {
+        const anns = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Announcement));
+        setAnnouncements(anns);
+      },
+      (error) => console.error("Announcements fetch error:", error)
+    );
+
+    let unsubNotifications: () => void = () => { };
+    if (user && !user.isGuest) {
+      const q = query(
+        collection(db, 'notifications'),
+        where('uid', '==', user.uid),
+        orderBy('createdAt', 'desc')
+      );
+      unsubNotifications = onSnapshot(q, (snapshot) => {
+        const notifs = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as AppNotification[];
+        setNotifications(notifs);
+      });
+    } else {
+      setNotifications([]);
+    }
+
     return () => {
       unsubscribe();
+      unsubNotifications();
+      unsubAnnouncements();
       clearTimeout(authTimeout);
       window.removeEventListener('scroll', handleScroll);
       window.removeEventListener('storage', refreshData);
     };
-  }, []);
+  }, [user?.uid, user?.isGuest]);
 
   const handleLogout = async () => {
     try {
@@ -250,7 +313,27 @@ const Layout: React.FC = () => {
     }
   };
 
-  const unreadCount = announcements.filter(a => !readNotifIds.includes(a.id)).length;
+  const unreadCount = notifications.filter(n => !n.isRead).length;
+
+  const handleMarkRead = async (id: string) => {
+    try {
+      await updateDoc(doc(db, 'notifications', id), { isRead: true });
+    } catch (error) {
+      console.error('Error marking read:', error);
+    }
+  };
+
+  const handleClearAll = async () => {
+    try {
+      const batch = writeBatch(db);
+      notifications.filter(n => !n.isRead && n.id).forEach(n => {
+        batch.update(doc(db, 'notifications', n.id as string), { isRead: true });
+      });
+      await batch.commit();
+    } catch (error) {
+      console.error('Error clearing notifications:', error);
+    }
+  };
   const isAdmin = user && !user.isGuest && (user.isAdmin || (user.email && ADMIN_CONFIG.AUTHORIZED_EMAILS.map((e: string) => e.toLowerCase()).includes(user.email.toLowerCase())));
 
   const searchResults = useMemo(() => {
@@ -279,6 +362,7 @@ const Layout: React.FC = () => {
   return (
     <div className="flex flex-col min-h-screen">
       <NavigationListener onNavigate={() => { setSearchQuery(""); setIsSearchOpen(false); setIsMenuOpen(false); }} />
+      <OfflineBanner />
       <CookieConsent />
       <MultiFunctionFAB showScrollTop={showScrollTop} onScrollTop={() => window.scrollTo({ top: 0, behavior: 'smooth' })} />
       <EnhancedTickerBar message={tickerMessage} onClickMessage={() => navigate('/announcements')} />
@@ -312,7 +396,15 @@ const Layout: React.FC = () => {
         </div>
       </header>
 
-      <NotificationDrawer isOpen={isNotifOpen} onClose={() => setIsNotifOpen(false)} announcements={announcements} readIds={readNotifIds} onMarkRead={(id) => { const next = [...new Set([...readNotifIds, id])]; setReadNotifIds(next); localStorage.setItem('sms_read_notifications', JSON.stringify(next)); }} onClearAll={() => { const allIds = announcements.map(a => a.id); setReadNotifIds(allIds); localStorage.setItem('sms_read_notifications', JSON.stringify(allIds)); }} />
+      <NotificationDrawer
+        isOpen={isNotifOpen}
+        onClose={() => setIsNotifOpen(false)}
+        notifications={notifications}
+        onMarkRead={handleMarkRead}
+        onClearAll={handleClearAll}
+        onEnablePush={requestPermission}
+        pushPermissionStatus={permissionStatus}
+      />
 
       <main className="flex-grow flex flex-col pb-20 lg:pb-0">
         <Suspense fallback={<PageLoader />}>
@@ -327,8 +419,12 @@ const Layout: React.FC = () => {
             <Route path="/games" element={<ProtectedRoute user={user}><GamesPage /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute user={user}><ProfilePage /></ProtectedRoute>} />
             <Route path="/journal" element={<ProtectedRoute user={user}><JournalPage /></ProtectedRoute>} />
+            <Route path="/leaderboard" element={<ProtectedRoute user={user}><LeaderboardPage /></ProtectedRoute>} />
             <Route path="/announcements" element={<AnnouncementsPage />} />
             <Route path="/calendar" element={<CalendarPage />} />
+            <Route path="/events" element={<EventsPage />} />
+            <Route path="/events/:eventId" element={<EventDetailPage />} />
+            <Route path="/contact" element={<ContactPage />} />
             <Route path="/setup" element={<ProtectedRoute user={user}><SetupPage /></ProtectedRoute>} />
             <Route path="/admin" element={isAdmin ? <AdminPage user={user} /> : <Navigate to="/" />} />
             <Route path="/terms" element={<TermsOfUse />} />
@@ -337,7 +433,7 @@ const Layout: React.FC = () => {
             <Route path="/copyright" element={<Copyright />} />
             <Route path="/community-guidelines" element={<CommunityGuidelines />} />
             <Route path="/submission-guidelines" element={<ContentSubmissionGuidelines />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>
       </main>
@@ -359,10 +455,15 @@ const Layout: React.FC = () => {
               <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-navy-300 mb-6 px-4">Navigation</h3>
               <nav className="space-y-1">
                 <MenuLink to="/" label="Home" icon={<Home size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/'} />
+                <MenuLink to="/calendar" label="National Calendar" icon={<Calendar size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/calendar'} />
+                <MenuLink to="/events" label="National Events" icon={<Sparkles size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname.startsWith('/events')} />
+                <MenuLink to="/contact" label="Contact Us" icon={<Phone size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/contact'} />
+
                 {user ? (
                   <>
                     <MenuLink to="/dashboard" label="My Dashboard" icon={<Activity size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/dashboard'} />
                     <MenuLink to="/namasmarana" label="Mantra Tracking" icon={<Mic size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/namasmarana'} />
+                    <MenuLink to="/leaderboard" label="Leaderboard" icon={<Trophy size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/leaderboard'} />
                     <MenuLink to="/book-club" label="Sai Lit Club" icon={<Library size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname.startsWith('/book-club')} />
                     <MenuLink to="/games" label="Play it" icon={<Gamepad2 size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/games'} />
                     <MenuLink to="/journal" label="Reflections" icon={<ScrollText size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/journal'} />

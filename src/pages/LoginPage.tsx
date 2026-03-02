@@ -48,6 +48,7 @@ const LoginPage: React.FC = () => {
     setLoading('guest');
     try {
       await signInAnonymously(auth);
+      localStorage.setItem('guestSession', 'true');
       showToast('Continuing as guest. Your progress won\'t be saved.', 'info', 4000);
       setTimeout(() => navigate('/'), 500);
     } catch (error: any) {

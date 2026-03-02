@@ -12,14 +12,9 @@ const ProfilePage: React.FC = () => {
   const [completions, setCompletions] = useState<string[]>([]);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
-  useEffect(() => {
-    // Override scroll anchor jump
-    window.scrollTo(0, 0);
-    const id = setTimeout(() => window.scrollTo(0, 0), 10);
-    return () => clearTimeout(id);
-  }, []);
+  const [badges, setBadges] = useState<{ badgeId: string, unlockedAt: any }[]>([]);
 
-  const loadUserData = () => {
+  const loadUserData = async () => {
     const saved = localStorage.getItem('sms_user');
     if (saved) {
       const userData = JSON.parse(saved) as UserProfile;
@@ -37,6 +32,13 @@ const ProfilePage: React.FC = () => {
         const userCompletions = JSON.parse(localStorage.getItem(`sms_completions`) || '[]');
         setStats(mergedStats);
         setCompletions(userCompletions);
+
+        // Fetch Badges
+        const { getDocs, collection } = await import('firebase/firestore');
+        const { db } = await import('../lib/firebase');
+        const badgesSnap = await getDocs(collection(db, 'users', userData.uid, 'badges'));
+        const earnedBadges = badgesSnap.docs.map(doc => doc.data() as { badgeId: string, unlockedAt: any });
+        setBadges(earnedBadges);
       }
     }
   };
@@ -130,6 +132,42 @@ const ProfilePage: React.FC = () => {
                 <span className="block text-[8px] text-navy-300 font-black uppercase tracking-widest mb-1">Japam Units</span>
                 <span className="text-2xl font-black text-navy-900">{stats.likitha.toLocaleString()}</span>
               </div>
+            </div>
+          </div>
+
+          {/* Badge Wall */}
+          <div className="bg-white p-8 rounded-bento shadow-lg border border-navy-50">
+            <h3 className="font-serif text-2xl font-bold mb-8 text-navy-900 flex items-center gap-3">
+              <Award className="text-gold-500" /> Sacred Badge Wall
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
+              {[
+                { id: 'first-offering', name: 'First Offering', icon: '🌟', color: 'bg-orange-100', text: 'Submitted your first sadhana.', fullColor: 'text-orange-600' },
+                { id: 'dedicated-devotee', name: 'Dedicated Devotee', icon: '🏆', color: 'bg-slate-100', text: '10,000 Total Mantras.', fullColor: 'text-slate-600' },
+                { id: 'spiritual-warrior', name: 'Spiritual Warrior', icon: '💎', color: 'bg-gold-50', text: '50,000 Total Mantras.', fullColor: 'text-gold-600' },
+                { id: 'consistent-sadhak', name: 'Consistent Sadhak', icon: '🔥', color: 'bg-red-50', text: 'Maintained a 7-day streak.', fullColor: 'text-red-500' },
+                { id: 'marathon-meditator', name: 'Marathon Meditator', icon: '🕉️', color: 'bg-gold-100', text: 'Maintained a 30-day streak.', fullColor: 'text-navy-900' }
+              ].map(badge => {
+                const isUnlocked = badges.some(b => b.badgeId === badge.id);
+                return (
+                  <div key={badge.id} className="group relative flex flex-col items-center">
+                    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-3xl transition-all duration-500 ${isUnlocked ? `${badge.color} shadow-lg scale-110` : 'bg-neutral-100 grayscale opacity-40 hover:opacity-100'}`}>
+                      {badge.icon}
+                    </div>
+                    <p className={`mt-3 text-[10px] font-black uppercase tracking-widest text-center leading-tight ${isUnlocked ? 'text-navy-900' : 'text-neutral-300'}`}>
+                      {badge.name}
+                    </p>
+
+                    {/* Tooltip */}
+                    <div className="absolute top-full mt-4 w-40 p-4 bg-navy-900 text-white rounded-xl text-center z-50 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-2xl">
+                      <p className="text-[10px] font-black uppercase mb-1">{badge.name}</p>
+                      <p className="text-[9px] opacity-70 leading-relaxed uppercase tracking-widest">{badge.text}</p>
+                      {isUnlocked && <p className="text-[8px] mt-2 text-gold-500 font-black uppercase">Unlocked</p>}
+                      <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-navy-900 rotate-45"></div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 

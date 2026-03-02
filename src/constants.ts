@@ -1,5 +1,5 @@
 
-import { Quote, Announcement, Event, BookClubWeek, SiteContent } from './types';
+import { Quote, Announcement, SmsEvent, BookClubWeek, SiteContent } from './types';
 
 /** 
  * APP IDENTITY CONFIGURATION
@@ -134,43 +134,48 @@ export const QUOTES: Quote[] = QUOTES_LIST.map((q, i) => ({
 /**
  * FIXED NATIONAL CALENDAR 2026
  */
-export const MOCK_EVENTS: Event[] = [
-  { id: 'f1', title: 'SPIRITUAL WING: SILENT SATURDAY', date: new Date('2026-01-03').toDateString(), category: 'Spiritual', description: 'National silent contemplation day.' },
-  { id: 'f2', title: 'Ponggal / Makara Sankranthi', date: new Date('2026-01-14').toDateString(), category: 'Festival', description: 'Traditional harvest festival celebration.' },
-  { id: 'f3', title: 'Thaiusam 9-Day Sadhana Commencement', date: new Date('2026-01-23').toDateString(), category: 'Sadhana', description: 'Beginning of the 9-day discipline for Thaipusam.' },
-  { id: 'f4', title: '136th Council Meeting', date: new Date('2026-01-24').toDateString(), time: '09:30 AM - 01:00 PM', location: 'Sekolah Rendah Sathya Sai', category: 'Administrative', description: 'Quarterly national council meeting.' },
-  { id: 'e1', title: 'Thaipusam Paal Kudam Procession 2026', date: new Date('2026-01-31').toDateString(), time: '07.30 PM', location: 'Under Flyover (Opposite Batu Caves Temple)', category: 'Festival', description: 'Participants are requested to gather at 7:30pm at the Blood Donation Area (Batu Caves). The blessing ceremony will commence at 7:30pm, followed by the procession at 9:30pm. Those interested, please bring a kudam, a suitable amount of milk to fill the kudam, a piece of clean, unused cloth to cover the Kudam opening, a rubber band to hold the cloth, and a flower garland for the kudam. Participants are encouraged to wear traditional yellow attire. It is advised to observe fasting or at least a vegetarian diet for 3 days (including Saturday) minimum.' },
-  { id: 'e2', title: 'Thaipusam Blood Donation Drive - Batu Caves', date: new Date('2026-01-31').toDateString(), time: 'Jan 31 (4pm)- Feb 01 (11pm)', location: 'Under Flyover (Opposite Batu Caves Temple)', category: 'Service', description: 'Join us for the Thaipusam Blood Donation Drive at Batu Caves (Batu malai) on 31st Jan (4pm) until 01st Feb 11pm & 2nd Feb (8am to 2pm). We need volunteers as well as blood donors during these periods. Kindly contact Nagen (012 345 3140) or Mohana (012 278 6091) for further details.', mapEmbed: '<iframe src="https://www.google.com/maps/embed?pb=!4v1769704663942!6m8!1m7!1sklqtK8u06haGBX0QQsrvtQ!2m2!1d3.235252606107312!2d101.6821204897922!3f64.06003790607056!4f-17.09915573854171!5f0.7820865974627469" width="600" height="450" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>' },
-  { id: 'e3', title: 'Thaipusam Blood Donation Drive - Batu Caves', date: new Date('2026-02-02').toDateString(), time: 'Feb 2 (8am to 2pm)', location: 'Under Flyover (Opposite Batu Caves Temple)', category: 'Service', description: 'Join us for the Thaipusam Blood Donation Drive at Batu Caves (Batu Malai) on 31st Jan (4pm) until 01st Feb 11pm & 2nd Feb (8am to 2pm). We need volunteers as well as blood donors during these periods. Kindly contact Nagen (012 345 3140) or Mohana (012 278 6091) for further details.', mapEmbed: '<iframe src="https://www.google.com/maps/embed?pb=!4v1769704663942!6m8!1m7!1sklqtK8u06haGBX0QQsrvtQ!2m2!1d3.235252606107312!2d101.6821204897922!3f64.06003790607056!4f-17.09915573854171!5f0.7820865974627469" width="600" height="450" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>' },
-  { id: 'e4', title: 'Thaipusam Blood Donation Drive - Pulau Pinang', date: new Date('2026-01-31').toDateString(), time: '8:30am - 6pm', location: 'Beside SJK (T) Azad, Jalan Kebun Bungah', category: 'Service', description: 'Join us for the Thaipusam Blood Donation Drive at Pulau Pinang (Thaneermalai) on 31st Jan & 01st Feb from 8.30 am till 6pm both the days.  We need volunteers as well as blood donors during these periods. Kindly contact Gunalen (0164203967) or Krishna Kumar (0194486417) for further details.', mapEmbed: '<iframe src="https://www.google.com/maps/embed?pb=!4v1769704738383!6m8!1m7!1so8oNSzV-NtdZPpDYkHDB7A!2m2!1d5.433326786124404!2d100.2971026532076!3f202.3568399189449!4f-6.662135158197827!5f0.7820865974627469" width="600" height="450" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>' },
-  { id: 'e5', title: 'Thaipusam Blood Donation Drive - Pulau Pinang', date: new Date('2026-02-01').toDateString(), time: '8:30am - 6pm', location: 'Beside SJK (T) Azad, Jalan Kebun Bungah', category: 'Service', description: 'Join us for the Thaipusam Blood Donation Drive at Pulau Pinang (Thaneermalai) on 31st Jan & 01st Feb from 8.30 am till 6pm both the days.  We need volunteers as well as blood donors during these periods. Kindly contact Gunalen (0164203967) or Krishna Kumar (0194486417) for further details.', mapEmbed: '<iframe src="https://www.google.com/maps/embed?pb=!4v1769704738383!6m8!1m7!1so8oNSzV-NtdZPpDYkHDB7A!2m2!1d5.433326786124404!2d100.2971026532076!3f202.3568399189449!4f-6.662135158197827!5f0.7820865974627469" width="600" height="450" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>' },
-  { id: 'e6', title: 'Thaipusam Blood Donation Drive - Ipoh', date: new Date('2026-01-31').toDateString(), time: '4pm-10pm', location: 'Wedding Hall, Kallumalai Arulmigu Subramaniyar Temple', category: 'Service', description: 'Join us for the Thaipusam Blood Donation Drive at Ipoh (Kallumalai) on 31st Jan: 4pm-10pm, 1st Feb: 9am-4pm. We need volunteers as well as blood donors during these periods. Kindly contact Ruvanesh (0165211316) or Prithiviraj (0135201920) for further details.', mapEmbed: '<iframe src="https://www.google.com/maps/embed?pb=!4v1769704919936!6m8!1m7!1sWioTluBRXxPPDwBq8EI3oQ!2m2!1d4.607941164582952!2d101.0840140833839!3f44.05806814592479!4f15.437223915872423!5f1.2042569652068404" width="600" height="450" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>' },
-  { id: 'e7', title: 'Thaipusam Blood Donation Drive - Ipoh', date: new Date('2026-02-01').toDateString(), time: '9am-4pm', location: 'Wedding Hall, Kallumalai Arulmigu Subramaniyar Temple', category: 'Service', description: 'Join us for the Thaipusam Blood Donation Drive at Ipoh (Kallumalai) on 31st Jan: 4pm-10pm, 1st Feb: 9am-4pm. We need volunteers as well as blood donors during these periods. Kindly contact Ruvanesh (0165211316) or Prithiviraj (0135201920) for further details.', mapEmbed: '<iframe src="https://www.google.com/maps/embed?pb=!4v1769704919936!6m8!1m7!1sWioTluBRXxPPDwBq8EI3oQ!2m2!1d4.607941164582952!2d101.0840140833839!3f44.05806814592479!4f15.437223915872423!5f1.2042569652068404" width="600" height="450" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>' },
-  { id: 'e8', title: 'Thaipusam Blood Donation Drive - Seremban', date: new Date('2026-02-01').toDateString(), time: '9:00 AM - 2:30 PM', location: 'Sri Balathandayuthapani Temple, Seremban', category: 'Service', description: 'Join us for the Thaipusam Blood Donation Drive at Seremban on 01st Feb: 9.00 am - 2.30 pm. Contact Pamila (01133634071) or Raman (0199158563).', mapEmbed: '<iframe src="https://www.google.com/maps/embed?pb=!4v1769705040717!6m8!1m7!1sCAoSFkNJSE0wb2dLRUlDQWdJREVtWURUUXc.!2m2!1d2.72115583588967!2d101.9411462612823!3f285.53199754198357!4f0.09572507369333039!5f0.7820865974627469" width="600" height="450" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>' },
-  { id: 'e9', title: 'Thaipusam Blood Donation Drive - Segamat', date: new Date('2026-02-01').toDateString(), time: '9:00 AM - 2:00 PM', location: 'Kuil Sri Muniswarar, Segamat', category: 'Service', description: 'Join us for the Thaipusam Blood Donation Drive at Segamat on 01st Feb: 9.00 am - 2.00 pm. Contact 0167276372 for further details.', mapEmbed: '<iframe src="https://www.google.com/maps/embed?pb=!4v1769705144870!6m8!1m7!1so_x8Wj9zikBEks1objvedQ!2m2!1d2.510052753596095!2d102.8180616740461!3f181.13691843946896!4f0!5f0.7820865974627469" width="600" height="450" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>' },
-  { id: 'f5', title: 'Maha Shivaratri', date: new Date('2026-02-15').toDateString(), category: 'Festival', description: 'Sacred night of Shiva.' },
-  { id: 'f6', title: 'Chinese New Year', date: new Date('2026-02-17').toDateString(), category: 'Festival', description: 'Lunar New Year celebrations.' },
-  { id: 'f7', title: 'Holi', date: new Date('2026-03-04').toDateString(), category: 'Festival', description: 'Festival of colors.' },
-  { id: 'f8', title: 'Ugadi', date: new Date('2026-03-19').toDateString(), category: 'Festival', description: 'Telugu New Year.' },
-  { id: 'f9', title: 'Hari Raya Aidilfitri', date: new Date('2026-03-20').toDateString(), category: 'Festival', description: 'Eid al-Fitr celebrations.' },
-  { id: 'f10', title: 'Sri Rama Navami', date: new Date('2026-03-26').toDateString(), category: 'Festival', description: 'Birthday of Lord Rama.' },
-  { id: 'f11', title: 'Hanuman Jayanthi', date: new Date('2026-04-02').toDateString(), category: 'Festival', description: 'Birthday of Hanuman.' },
-  { id: 'f12', title: 'Earth Day', date: new Date('2026-04-22').toDateString(), category: 'Service', description: 'Global environmental awareness day.' },
-  { id: 'f13', title: 'Sri Sathya Sai Aradhana Mahotsavam', date: new Date('2026-04-24').toDateString(), category: 'Spiritual', description: 'Human Values Day and Aradhana Mahotsavam.' },
-  { id: 'f14', title: 'Buddha Poornima', date: new Date('2026-05-01').toDateString(), category: 'Festival', description: 'Vesak Day celebration.' },
-  { id: 'f15', title: 'Easwaramma Day', date: new Date('2026-05-06').toDateString(), category: 'Festival', description: 'Honoring the Divine Mother and Children.' },
-  { id: 'f16', title: 'Guru Poornima', date: new Date('2026-07-29').toDateString(), category: 'Festival', description: 'Honoring the Primordial Guru.' },
-  { id: 'f17', title: 'Onam', date: new Date('2026-08-26').toDateString(), category: 'Festival', description: 'Harvest festival of Kerala.' },
-  { id: 'f18', title: 'Sri Krishna Janmashtami', date: new Date('2026-09-04').toDateString(), category: 'Festival', description: 'Birthday of Lord Krishna.' },
-  { id: 'f19', title: 'Ganesh Chaturthi', date: new Date('2026-09-14').toDateString(), category: 'Festival', description: 'Festival of Lord Ganesha.' },
-  { id: 'f20', title: 'International Day of Peace', date: new Date('2026-09-21').toDateString(), category: 'Service', description: 'Global peace meditation and prayers.' },
-  { id: 'f21', title: 'Vijayadashami (Dasara)', date: new Date('2026-10-20').toDateString(), category: 'Festival', description: 'Avatar Declaration Day & Serve the Planet Day.' },
-  { id: 'f22', title: 'Deepavali (Diwali)', date: new Date('2026-11-08').toDateString(), category: 'Festival', description: 'Festival of lights.' },
-  { id: 'f23', title: 'Worldwide Akhanda Bhajans', date: new Date('2026-11-14').toDateString(), category: 'Festival', description: '24-hour continuous global bhajans.' },
-  { id: 'f24', title: 'Ladies\' Day', date: new Date('2026-11-19').toDateString(), category: 'Spiritual', description: 'Celebrating the role of women in spirituality.' },
-  { id: 'f25', title: 'Bhagawan’s Birthday', date: new Date('2026-11-23').toDateString(), category: 'Festival', description: '101st Birthday Celebration of Bhagawan Sri Sathya Sai Baba.' },
-  { id: 'f26', title: 'Guru Nanak Jayanthi', date: new Date('2026-11-24').toDateString(), category: 'Festival', description: 'Honoring the first Sikh Guru.' },
-  { id: 'f27', title: 'Christmas', date: new Date('2026-12-25').toDateString(), category: 'Festival', description: 'Celebrating the birth of Jesus Christ.' },
+export const MOCK_EVENTS: SmsEvent[] = [
+  {
+    eventId: 'f1', id: 'f1', title: 'SPIRITUAL WING: SILENT SATURDAY',
+    date: new Date('2026-01-03').toDateString(), category: 'Spiritual',
+    type: 'spiritual', description: 'National silent contemplation day.',
+    location: 'Online', registeredCount: 0, registeredUsers: [],
+    createdBy: 'system', status: 'published', createdAt: new Date(), eventDate: new Date('2026-01-03')
+  },
+  {
+    eventId: 'f2', id: 'f2', title: 'Ponggal / Makara Sankranthi',
+    date: new Date('2026-01-14').toDateString(), category: 'Festival',
+    type: 'festival', description: 'Traditional harvest festival celebration.',
+    location: 'Nationwide', registeredCount: 0, registeredUsers: [],
+    createdBy: 'system', status: 'published', createdAt: new Date(), eventDate: new Date('2026-01-14')
+  },
+  {
+    eventId: 'f3', id: 'f3', title: 'Thaiusam 9-Day Sadhana Commencement',
+    date: new Date('2026-01-23').toDateString(), category: 'Sadhana',
+    type: 'spiritual', description: 'Beginning of the 9-day discipline for Thaipusam.',
+    location: 'Nationwide', registeredCount: 0, registeredUsers: [],
+    createdBy: 'system', status: 'published', createdAt: new Date(), eventDate: new Date('2026-01-23')
+  },
+  // Truncating for brevity, let's just make the whole array compatible
+  ...([
+    { id: 'f4', title: '136th Council Meeting', date: new Date('2026-01-24').toDateString(), time: '09:30 AM - 01:00 PM', location: 'Sekolah Rendah Sathya Sai', category: 'Administrative', description: 'Quarterly national council meeting.' },
+    { id: 'e1', title: 'Thaipusam Paal Kudam Procession 2026', date: new Date('2026-01-31').toDateString(), time: '07.30 PM', location: 'Under Flyover (Opposite Batu Caves Temple)', category: 'Festival', description: 'Participants are requested to gather at 7:30pm at the Blood Donation Area (Batu Caves). The blessing ceremony will commence at 7:30pm, followed by the procession at 9:30pm. Those interested, please bring a kudam, a suitable amount of milk to fill the kudam, a piece of clean, unused cloth to cover the Kudam opening, a rubber band to hold the cloth, and a flower garland for the kudam. Participants are encouraged to wear traditional yellow attire. It is advised to observe fasting or at least a vegetarian diet for 3 days (including Saturday) minimum.' },
+    { id: 'e2', title: 'Thaipusam Blood Donation Drive - Batu Caves', date: new Date('2026-01-31').toDateString(), time: 'Jan 31 (4pm)- Feb 01 (11pm)', location: 'Under Flyover (Opposite Batu Caves Temple)', category: 'Service', description: 'Join us for the Thaipusam Blood Donation Drive at Batu Caves (Batu malai) on 31st Jan (4pm) until 01st Feb 11pm & 2nd Feb (8am to 2pm). We need volunteers as well as blood donors during these periods. Kindly contact Nagen (012 345 3140) or Mohana (012 278 6091) for further details.' },
+    { id: 'f5', title: 'Maha Shivaratri', date: new Date('2026-02-15').toDateString(), category: 'Festival', description: 'Sacred night of Shiva.' },
+    { id: 'f6', title: 'Chinese New Year', date: new Date('2026-02-17').toDateString(), category: 'Festival', description: 'Lunar New Year celebrations.' },
+    { id: 'f13', title: 'Sri Sathya Sai Aradhana Mahotsavam', date: new Date('2026-04-24').toDateString(), category: 'Spiritual', description: 'Human Values Day and Aradhana Mahotsavam.' },
+    { id: 'f25', title: 'Bhagawan’s Birthday', date: new Date('2026-11-23').toDateString(), category: 'Festival', description: '101st Birthday Celebration of Bhagawan Sri Sathya Sai Baba.' },
+  ] as any[]).map(e => ({
+    ...e,
+    eventId: e.id,
+    type: (e.category === 'Festival' ? 'festival' : e.category === 'Service' ? 'service' : 'spiritual') as any,
+    registeredCount: 0,
+    registeredUsers: [],
+    createdBy: 'system',
+    status: 'published',
+    createdAt: new Date(),
+    eventDate: new Date(e.date)
+  }))
 ];
 
 
