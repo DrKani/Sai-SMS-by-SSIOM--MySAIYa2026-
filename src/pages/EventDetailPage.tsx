@@ -66,6 +66,11 @@ const EventDetailPage: React.FC = () => {
             return;
         }
 
+        if (event.maxAttendees && (event.registeredCount || 0) >= event.maxAttendees) {
+            showToast("Registration is full for this event.", "error");
+            return;
+        }
+
         setIsRegistering(true);
         try {
             const eventRef = doc(db, 'calendar', event.eventId);
@@ -120,8 +125,8 @@ const EventDetailPage: React.FC = () => {
                 <div className="lg:col-span-2 space-y-12">
                     <div className="space-y-6">
                         <span className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-md ${event.type === 'spiritual' ? 'bg-purple-100 text-purple-700' :
-                                event.type === 'service' ? 'bg-teal-100 text-teal-700' :
-                                    event.type === 'festival' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'
+                            event.type === 'service' ? 'bg-teal-100 text-teal-700' :
+                                event.type === 'festival' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'
                             }`}>
                             {event.type || event.category}
                         </span>

@@ -250,6 +250,8 @@ const BookClubPage: React.FC = () => {
   const [reflection, setReflection] = useState("");
   const [isReflectionPublic, setIsReflectionPublic] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [hasScrolledToBottom, setHasScrolledToBottom] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
   const readingContainerRef = useRef<HTMLDivElement>(null);
 
@@ -363,12 +365,39 @@ const BookClubPage: React.FC = () => {
     const { scrollTop, scrollHeight, clientHeight } = readingContainerRef.current;
     const progress = Math.round((scrollTop / (scrollHeight - clientHeight)) * 100);
     setScrollPercentage(progress);
+
+    // Quick fallback check for very short content (if observer didn't fire)
+    if (progress > 95) {
+      setHasScrolledToBottom(true);
+    }
   };
+
+  useEffect(() => {
+    setHasScrolledToBottom(false);
+  }, [activeWeekId]);
+
+  useEffect(() => {
+    if (!hasScrolledToBottom && bottomRef.current) {
+      const observer = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting) {
+          setHasScrolledToBottom(true);
+        }
+      }, { threshold: 0.1 });
+
+      observer.observe(bottomRef.current);
+      return () => observer.disconnect();
+    }
+  }, [hasScrolledToBottom, viewMode, activeWeekId]);
 
   // --- ACTIONS ---
 
   const handleMarkRead = async () => {
     if (!user || !activeWeek || hasMarkedRead || isSubmitting) return;
+
+    if (!hasScrolledToBottom) {
+      showToast("Please scroll and read the entire chapter before marking as complete.", "warning");
+      return;
+    }
 
     setIsSubmitting(true);
 
@@ -903,16 +932,16 @@ const BookClubPage: React.FC = () => {
                     {/* Take Quiz — awards Excellence Badge, gated by scroll */}
                     <button
                       onClick={handleTakeQuiz}
-                      disabled={user?.isGuest || scrollPercentage < 90}
-                      style={{ background: user?.isGuest || scrollPercentage < 90 ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg, #F5C842 0%, #D4A017 100%)' }}
-                      className={`p-6 ${user?.isGuest || scrollPercentage < 90 ? 'text-navy-300' : 'text-navy-900'} rounded-[2rem] shadow-lg transition-all ${user?.isGuest || scrollPercentage < 90 ? 'opacity-50 cursor-not-allowed border border-white/10' : 'hover:scale-105'}`}
+                      disabled={user?.isGuest || !hasScrolledToBottom}
+                      style={{ background: user?.isGuest || !hasScrolledToBottom ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg, #F5C842 0%, #D4A017 100%)' }}
+                      className={`p-6 ${user?.isGuest || !hasScrolledToBottom ? 'text-navy-300' : 'text-navy-900'} rounded-[2rem] shadow-lg transition-all ${user?.isGuest || !hasScrolledToBottom ? 'opacity-50 cursor-not-allowed border border-white/10' : 'hover:scale-105'}`}
                     >
                       <div className="flex items-center justify-center gap-2 mb-1">
-                        {user?.isGuest || scrollPercentage < 90 ? <Lock size={20} className="text-navy-300" /> : <Sparkles size={20} />}
+                        {user?.isGuest || !hasScrolledToBottom ? <Lock size={20} className="text-navy-300" /> : <Sparkles size={20} />}
                         <span className="block text-xl font-bold">Take Quiz</span>
                       </div>
-                      <span className={`text-[10px] font-black uppercase tracking-widest ${user?.isGuest || scrollPercentage < 90 ? 'text-navy-300' : 'text-navy-700'}`}>
-                        {user?.isGuest ? 'Sign in to take quiz' : scrollPercentage < 90 ? 'Read to 90% to unlock' : 'Earn Excellence Badge'}
+                      <span className={`text-[10px] font-black uppercase tracking-widest ${user?.isGuest || !hasScrolledToBottom ? 'text-navy-300' : 'text-navy-700'}`}>
+                        {user?.isGuest ? 'Sign in to take quiz' : !hasScrolledToBottom ? 'Read chapter to unlock' : 'Earn Excellence Badge'}
                       </span>
                     </button>
                   </div>
