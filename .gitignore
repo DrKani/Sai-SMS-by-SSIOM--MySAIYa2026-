@@ -16,3 +16,4 @@ dist/
 
 functions/node_modules/
 firebase-debug.log
+dist/

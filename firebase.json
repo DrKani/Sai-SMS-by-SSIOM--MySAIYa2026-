@@ -1,5 +1,6 @@
 {
     "hosting": {
+        "site": "sai-sms-by-ssiom-mysaiya-2026",
         "public": "dist",
         "ignore": [
             "firebase.json",

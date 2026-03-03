@@ -1,5 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import './index.css';
 import App from './App';
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -30,18 +31,18 @@ if (loader) {
 
 /**
  * SERVICE WORKER
- * Only register in production. In development, unregister any existing SW
- * so stale cached JS bundles never block the app from rendering.
+ * Offline capabilities are enabled here for production caching.
+ * In development, we recommend using incognito or disabling cache to avoid stale bundles.
  */
 if ('serviceWorker' in navigator) {
   if (import.meta.env.PROD) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js')
+      navigator.serviceWorker.register('/sw.js', { scope: '/' })
         .then(registration => {
           console.log('Sai SMS ServiceWorker active. Scope:', registration.scope);
         })
         .catch(err => {
-          console.debug('ServiceWorker registration skipped:', err.message || err);
+          console.error('ServiceWorker registration failed:', err);
         });
     });
   } else {

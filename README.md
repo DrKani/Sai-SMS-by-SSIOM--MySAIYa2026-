@@ -1,20 +1,45 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Sai Sadhana Made Simple (Sai SMS) by SSIOM
 
-# Run and deploy your AI Studio app
+A digital spiritual hub for SSIOM Malaysia members. Track your sadhana, join the National Book Club, and explore spiritual growth tools.
 
-This contains everything you need to run your app locally.
+## Prerequisites
 
-View your app in AI Studio: https://ai.studio/apps/drive/1PYAsXhRAHXaOhw015uESjrEe262hPxDY
+- Node.js (v18 or higher recommended)
+- Firebase project setup
 
-## Run Locally
-
-**Prerequisites:**  Node.js
-
+## Setup & Running Locally
 
 1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+   ```bash
+   npm install
+   ```
+
+2. Configure Environment:
+   Create a `.env` file based on the `.env.example` template and add your Firebase credentials.
+   ```bash
+   cp .env.example .env
+   ```
+
+3. Start Development Server:
+   ```bash
+   npm run dev
+   ```
+
+## Folder Structure
+
+- `/src`: Application source code (React + Vite)
+- `/public`: Static assets
+- `/docs`: Markdown documentation files
+- `/functions`: Firebase Cloud Functions
+
+## Technologies
+
+- React 19
+- Vite
+- Firebase (Auth, Firestore, Hosting)
+- Tailwind CSS
+- TypeScript
+
+## License
+
+© 2026 SSIOM Malaysia. All Rights Reserved.
