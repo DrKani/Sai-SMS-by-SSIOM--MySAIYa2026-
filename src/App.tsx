@@ -375,23 +375,23 @@ const Layout: React.FC = () => {
         </div>
       )}
 
-      <header className="sticky top-10 z-[50] bg-white shadow-md h-20">
+      <header className="navbar site-header sticky top-10 z-[50] bg-white shadow-md h-20">
         <div className="max-w-7xl mx-auto px-4 h-full flex justify-between items-center gap-4">
           <Link to="/" className="flex items-center gap-3 shrink-0">
             <div className="w-12 h-12 rounded-full flex items-center justify-center overflow-hidden border border-navy-50">
               <img src={branding.logoHeader} className="w-full h-full object-contain" alt="Logo" />
             </div>
             <div className="hidden lg:flex flex-col">
-              <span className="font-serif font-bold text-navy-900 text-lg leading-tight uppercase">{APP_CONFIG.NAME}</span>
-              <span className="text-[10px] text-navy-500 font-medium tracking-wide">{APP_CONFIG.TAGLINE}</span>
+              <span className="brand-text font-serif font-bold text-navy-900 text-lg leading-tight uppercase">{APP_CONFIG.NAME}</span>
+              <span className="brand-subtitle text-[10px] text-navy-500 font-medium tracking-wide">{APP_CONFIG.TAGLINE}</span>
             </div>
           </Link>
           <EnhancedSearchBar searchQuery={searchQuery} setSearchQuery={setSearchQuery} isSearchOpen={isSearchOpen} setIsSearchOpen={setIsSearchOpen} searchResults={searchResults} onSelect={(link) => { navigate(link); setIsSearchOpen(false); setSearchQuery(""); }} placeholder="Search resources..." />
           <div className="flex items-center gap-2 lg:gap-4 shrink-0">
             <NotificationBell unreadCount={unreadCount} onClick={() => setIsNotifOpen(true)} />
-            {isAdmin && <Link to="/admin" className="hidden lg:flex px-3 py-2 rounded-xl bg-purple-50 text-purple-700 font-black text-[10px] uppercase tracking-widest hover:bg-purple-100 transition-all items-center gap-2"><ShieldCheck size={14} /> Admin</Link>}
+            {isAdmin && <Link to="/admin" className="btn-admin hidden lg:flex px-3 py-2 rounded-xl bg-purple-50 text-purple-700 font-black text-[10px] uppercase tracking-widest hover:bg-purple-100 transition-all items-center gap-2"><ShieldCheck size={14} /> Admin</Link>}
             <ProfileDropdown user={user} isAdmin={isAdmin} onLogout={() => setShowLogoutConfirm(true)} />
-            <button onClick={() => setIsMenuOpen(true)} className="p-2 min-h-[44px] min-w-[44px] text-navy-900 hover:text-purple-600 transition-colors flex items-center justify-center rounded-xl hover:bg-navy-50">
+            <button onClick={() => setIsMenuOpen(true)} className="hamburger-btn p-2 min-h-[44px] min-w-[44px] text-navy-900 hover:text-purple-600 transition-colors flex items-center justify-center rounded-xl hover:bg-navy-50">
               <Menu size={28} /><span className="sr-only">Menu</span>
             </button>
           </div>
@@ -446,8 +446,8 @@ const Layout: React.FC = () => {
 
       {isMenuOpen && (
         <div className="fixed inset-0 z-[100] flex justify-end">
-          <div className="absolute inset-0 bg-navy-900/60 backdrop-blur-sm" onClick={() => setIsMenuOpen(false)}></div>
-          <div className="relative w-80 h-full bg-white shadow-2xl p-8 flex flex-col overflow-y-auto animate-in slide-in-from-right duration-300">
+          <div className="mobile-nav-overlay absolute inset-0 bg-navy-900/60 backdrop-blur-sm" onClick={() => setIsMenuOpen(false)}></div>
+          <div className="mobile-nav-drawer relative w-80 h-full bg-white shadow-2xl p-8 flex flex-col overflow-y-auto animate-in slide-in-from-right duration-300">
             <button onClick={() => setIsMenuOpen(false)} className="absolute top-6 right-6 p-2 min-h-[44px] min-w-[44px] text-navy-200 hover:text-navy-900 hover:bg-neutral-100 rounded-full transition-all flex items-center justify-center"><X size={32} /></button>
             <div className="mt-16 space-y-12 flex-grow">
               {user?.isGuest && (

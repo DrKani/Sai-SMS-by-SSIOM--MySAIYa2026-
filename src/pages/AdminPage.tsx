@@ -1386,6 +1386,7 @@ const EventManager = ({ adminEmail }: { adminEmail: string }) => {
    const [events, setEvents] = useState<SmsEvent[]>([]);
    const [isLoading, setIsLoading] = useState(true);
    const [isSaving, setIsSaving] = useState(false);
+   const [editingId, setEditingId] = useState<string | null>(null);
 
    const [newEvent, setNewEvent] = useState<Partial<SmsEvent>>({
       title: '',
@@ -1430,16 +1431,23 @@ const EventManager = ({ adminEmail }: { adminEmail: string }) => {
             location: newEvent.location,
             type: newEvent.type || 'spiritual',
             maxAttendees: Number(newEvent.maxAttendees) || 0,
-            registeredCount: 0,
-            registeredUsers: [],
             imageUrl: newEvent.imageUrl || '',
-            createdBy: currentUser.uid || 'admin',
-            createdAt: serverTimestamp(),
             status: newEvent.status || 'published'
          };
 
-         await addDoc(collection(db, 'calendar'), eventData);
-         logAdminAction(adminEmail, 'Created Event', newEvent.title);
+         if (editingId) {
+            await updateDoc(doc(db, 'calendar', editingId), eventData);
+            logAdminAction(adminEmail, 'Edited Event', newEvent.title || 'Unknown');
+            alert("Event updated successfully!");
+         } else {
+            eventData.registeredCount = 0;
+            eventData.registeredUsers = [];
+            eventData.createdBy = currentUser.uid || 'admin';
+            eventData.createdAt = serverTimestamp();
+            await addDoc(collection(db, 'calendar'), eventData);
+            logAdminAction(adminEmail, 'Created Event', newEvent.title || 'Unknown');
+            alert("Event published successfully!");
+         }
 
          setNewEvent({
             title: '',
@@ -1450,13 +1458,33 @@ const EventManager = ({ adminEmail }: { adminEmail: string }) => {
             maxAttendees: 100,
             status: 'published'
          });
-         alert("Event published successfully!");
+         setEditingId(null);
       } catch (error) {
          console.error("Error saving event:", error);
-         alert("Failed to publish event.");
+         alert(editingId ? "Failed to update event." : "Failed to publish event.");
       } finally {
          setIsSaving(false);
       }
+   };
+
+   const handleEdit = (evt: SmsEvent) => {
+      let dateString = '';
+      if (evt.eventDate) {
+         const dateObj = (evt.eventDate as any).toDate ? (evt.eventDate as any).toDate() : new Date(evt.eventDate);
+         dateString = new Date(dateObj.getTime() - dateObj.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+      }
+
+      setNewEvent({
+         title: evt.title,
+         description: evt.description,
+         eventDate: dateString,
+         location: evt.location,
+         type: evt.type,
+         maxAttendees: evt.maxAttendees,
+         imageUrl: evt.imageUrl,
+         status: evt.status
+      });
+      setEditingId(evt.eventId);
    };
 
    const handleDelete = async (id: string) => {
@@ -1481,7 +1509,25 @@ const EventManager = ({ adminEmail }: { adminEmail: string }) => {
 
          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <Card className="p-8 space-y-6">
-               <h3 className="text-lg font-bold text-navy-900 border-b border-navy-50 pb-4">Create New Event</h3>
+               <div className="flex justify-between items-center border-b border-navy-50 pb-4">
+                  <h3 className="text-lg font-bold text-navy-900">{editingId ? 'Edit Event' : 'Create New Event'}</h3>
+                  {editingId && (
+                     <button onClick={() => {
+                        setEditingId(null);
+                        setNewEvent({
+                           title: '',
+                           description: '',
+                           eventDate: new Date().toISOString().slice(0, 16),
+                           location: '',
+                           type: 'spiritual',
+                           maxAttendees: 100,
+                           status: 'published'
+                        });
+                     }} className="text-[10px] font-black uppercase text-navy-300 hover:text-navy-900 tracking-widest flex items-center gap-1">
+                        <X size={12} /> Cancel Edit
+                     </button>
+                  )}
+               </div>
                <div className="space-y-4">
                   <div>
                      <label className="text-[10px] font-black uppercase text-navy-300 mb-1 block">Event Title</label>
@@ -1532,10 +1578,10 @@ const EventManager = ({ adminEmail }: { adminEmail: string }) => {
                   <button
                      disabled={isSaving}
                      onClick={handleSave}
-                     className="w-full py-4 bg-navy-900 text-gold-500 font-black uppercase tracking-widest rounded-xl shadow-lg hover:scale-[1.02] disabled:opacity-50 disabled:scale-100 transition-all flex items-center justify-center gap-2"
+                     className={`w-full py-4 font-black uppercase tracking-widest rounded-xl shadow-lg hover:scale-[1.02] disabled:opacity-50 disabled:scale-100 transition-all flex items-center justify-center gap-2 ${editingId ? 'bg-purple-600 text-white hover:bg-purple-700' : 'bg-navy-900 text-gold-500 hover:bg-navy-800'}`}
                   >
-                     {isSaving ? <RefreshCw className="animate-spin" size={16} /> : <Plus size={16} />}
-                     Publish Event
+                     {isSaving ? <RefreshCw className="animate-spin" size={16} /> : editingId ? <Save size={16} /> : <Plus size={16} />}
+                     {editingId ? 'Save Changes' : 'Publish Event'}
                   </button>
                </div>
             </Card>
@@ -1581,9 +1627,14 @@ const EventManager = ({ adminEmail }: { adminEmail: string }) => {
                                  </div>
                               </div>
                            </div>
-                           <button onClick={() => handleDelete(evt.eventId)} className="p-3 text-red-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all opacity-0 group-hover:opacity-100">
-                              <Trash2 size={18} />
-                           </button>
+                           <div className="flex items-center gap-1 opacity-100 lg:opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button onClick={() => handleEdit(evt)} className="p-3 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all">
+                                 <Edit3 size={18} />
+                              </button>
+                              <button onClick={() => handleDelete(evt.eventId)} className="p-3 text-red-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all">
+                                 <Trash2 size={18} />
+                              </button>
+                           </div>
                         </div>
                      ))
                   )}
@@ -1777,7 +1828,7 @@ const ArticleCommentModeration = ({ adminEmail }: { adminEmail: string }) => {
                               {articles[c.articleId] || c.articleId}
                            </p>
                            <span className={`inline-block px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest ${c.status === 'approved' ? 'bg-green-100 text-green-700' :
-                                 c.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-gold-100 text-gold-700'
+                              c.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-gold-100 text-gold-700'
                               }`}>{c.status}</span>
                         </div>
                         <div className="flex-grow">

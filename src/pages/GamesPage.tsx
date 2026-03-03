@@ -98,28 +98,28 @@ const GamesPage: React.FC = () => {
         <p className="text-navy-500 max-w-2xl mx-auto font-medium">Life is a Game, Play it! BABA.<br /><br />Explore. Experience. Evolve.&nbsp; Engage the Mind, Awaken the Heart in this series of simple Games structured to assist you in learning the Sathya Sai Teachings and living the values</p>
       </header>
 
-      <nav className="flex flex-wrap justify-center gap-4 md:gap-6">
+      <nav className="games-tabs flex flex-wrap justify-center gap-4 md:gap-6">
         <button
           onClick={() => { setGameMode('puzzle'); }}
-          className={`flex items-center gap-3 px-8 py-4 rounded-3xl font-black uppercase tracking-widest text-[11px] transition-all border-2 ${gameMode === 'puzzle' ? 'bg-navy-900 text-gold-500 border-navy-900 shadow-2xl scale-105' : 'bg-white text-navy-300 border-navy-50 hover:border-navy-100'}`}
+          className={`games-tab-btn flex items-center gap-3 px-8 py-4 rounded-3xl font-black uppercase tracking-widest text-[11px] transition-all border-2 ${gameMode === 'puzzle' ? 'bg-navy-900 text-gold-500 border-navy-900 shadow-2xl scale-105 active' : 'bg-white text-navy-300 border-navy-50 hover:border-navy-100'}`}
         >
           <Puzzle size={18} /> Quotescapes
         </button>
         <button
           onClick={() => { setGameMode('quiz'); }}
-          className={`flex items-center gap-3 px-8 py-4 rounded-3xl font-black uppercase tracking-widest text-[11px] transition-all border-2 ${gameMode === 'quiz' ? 'bg-navy-900 text-gold-500 border-navy-900 shadow-2xl scale-105' : 'bg-white text-navy-300 border-navy-50 hover:border-navy-100'}`}
+          className={`games-tab-btn flex items-center gap-3 px-8 py-4 rounded-3xl font-black uppercase tracking-widest text-[11px] transition-all border-2 ${gameMode === 'quiz' ? 'bg-navy-900 text-gold-500 border-navy-900 shadow-2xl scale-105 active' : 'bg-white text-navy-300 border-navy-50 hover:border-navy-100'}`}
         >
           <HelpCircle size={18} /> Sai SMS Parikshya
         </button>
         <button
           onClick={() => { setGameMode('wordsearch'); }}
-          className={`flex items-center gap-3 px-8 py-4 rounded-3xl font-black uppercase tracking-widest text-[11px] transition-all border-2 ${gameMode === 'wordsearch' ? 'bg-navy-900 text-gold-500 border-navy-900 shadow-2xl scale-105' : 'bg-white text-navy-300 border-navy-50 hover:border-navy-100'}`}
+          className={`games-tab-btn flex items-center gap-3 px-8 py-4 rounded-3xl font-black uppercase tracking-widest text-[11px] transition-all border-2 ${gameMode === 'wordsearch' ? 'bg-navy-900 text-gold-500 border-navy-900 shadow-2xl scale-105 active' : 'bg-white text-navy-300 border-navy-50 hover:border-navy-100'}`}
         >
           <Search size={18} /> Word Search
         </button>
         <button
           onClick={() => { setGameMode('crossword'); }}
-          className={`flex items-center gap-3 px-8 py-4 rounded-3xl font-black uppercase tracking-widest text-[11px] transition-all border-2 ${gameMode === 'crossword' ? 'bg-navy-900 text-gold-500 border-navy-900 shadow-2xl scale-105' : 'bg-white text-navy-300 border-navy-50 hover:border-navy-100'}`}
+          className={`games-tab-btn flex items-center gap-3 px-8 py-4 rounded-3xl font-black uppercase tracking-widest text-[11px] transition-all border-2 ${gameMode === 'crossword' ? 'bg-navy-900 text-gold-500 border-navy-900 shadow-2xl scale-105 active' : 'bg-white text-navy-300 border-navy-50 hover:border-navy-100'}`}
         >
           <Gamepad2 size={18} /> Sacred Crossword
         </button>

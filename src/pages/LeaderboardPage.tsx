@@ -37,7 +37,7 @@ const LeaderboardPage: React.FC = () => {
         if (saved) setUser(JSON.parse(saved));
     }, []);
 
-    const getStartOfPeriod = (period: string) => {
+    const getStartOfPeriodStr = (period: string) => {
         const date = new Date();
         if (period === 'Today') {
             date.setHours(0, 0, 0, 0);
@@ -52,16 +52,14 @@ const LeaderboardPage: React.FC = () => {
         } else {
             return null;
         }
-        return date.toISOString();
+        // sadhanaDaily uses 'date' as "YYYY-MM-DD"
+        return new Date(date.getTime() - (date.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
     };
 
     useEffect(() => {
-        setIsLoading(true);
-        let unsub: () => void = () => { };
-
         const fetchLeaderboard = async () => {
             try {
-                const startISO = getStartOfPeriod(timePeriod);
+                const startStr = getStartOfPeriodStr(timePeriod);
 
                 let q;
                 if (timePeriod === 'AllTime') {
@@ -98,9 +96,9 @@ const LeaderboardPage: React.FC = () => {
                     // For periodic stats, we MUST query sadhanaDaily
                     q = query(
                         collection(db, 'sadhanaDaily'),
-                        where('timestamp', '>=', startISO),
+                        where('date', '>=', startStr),
                         where('publicLeaderboard', '==', true),
-                        orderBy('timestamp', 'desc')
+                        orderBy('date', 'desc')
                     );
 
                     const snap = await getDocs(q);
@@ -139,6 +137,33 @@ const LeaderboardPage: React.FC = () => {
 
     const filteredLeaderboard = useMemo(() => {
         let list = leaderboard;
+
+        // Perform Aggregation based on Tab
+        if (activeTab === 'State') {
+            const stateTotals: Record<string, LeaderboardEntry> = {};
+            list.forEach(e => {
+                if (!stateTotals[e.state]) {
+                    stateTotals[e.state] = { ...e, uid: e.state, name: e.state, count: 0, centre: 'State Total' };
+                }
+                stateTotals[e.state].count += e.count;
+            });
+            list = Object.values(stateTotals);
+        } else if (activeTab === 'Centre') {
+            const centreTotals: Record<string, LeaderboardEntry> = {};
+            list.forEach(e => {
+                const key = `${e.centre} (${e.state})`;
+                if (!centreTotals[key]) {
+                    centreTotals[key] = { ...e, uid: key, name: e.centre, count: 0, centre: e.state };
+                }
+                centreTotals[key].count += e.count;
+            });
+            list = Object.values(centreTotals);
+        }
+
+        // Re-sort and rank after aggregation
+        list.sort((a, b) => b.count - a.count);
+        list = list.map((e, idx) => ({ ...e, rank: idx + 1 }));
+
         if (searchQuery) {
             list = list.filter(e =>
                 e.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -147,14 +172,8 @@ const LeaderboardPage: React.FC = () => {
             );
         }
 
-        if (activeTab === 'State' && user?.state) {
-            list = list.filter(e => e.state === user.state);
-        } else if (activeTab === 'Centre' && user?.centre) {
-            list = list.filter(e => e.centre === user.centre);
-        }
-
         return list;
-    }, [leaderboard, searchQuery, activeTab, user]);
+    }, [leaderboard, searchQuery, activeTab]);
 
     const topThree = filteredLeaderboard.slice(0, 3);
     const theRest = filteredLeaderboard.slice(3);
@@ -176,7 +195,7 @@ const LeaderboardPage: React.FC = () => {
                                 onClick={() => setActiveTab(tab)}
                                 className={`flex-1 md:flex-none px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === tab ? 'bg-navy-900 text-gold-500 shadow-lg' : 'text-navy-400 hover:text-navy-900'}`}
                             >
-                                {tab === 'State' ? user?.state || 'My State' : tab === 'Centre' ? user?.centre || 'My Centre' : tab}
+                                {tab === 'State' ? 'Top States' : tab === 'Centre' ? 'Top Centres' : 'National Individual'}
                             </button>
                         ))}
                     </div>
@@ -231,8 +250,8 @@ const LeaderboardPage: React.FC = () => {
                                     <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-neutral-100 border-4 border-white text-neutral-500 rounded-full flex items-center justify-center font-black shadow-md">2</div>
                                 </div>
                                 <div className="text-center">
-                                    <h4 className="font-bold text-navy-900">{topThree[1].name}</h4>
-                                    <p className="text-[10px] text-navy-400 font-black uppercase tracking-widest">{topThree[1].centre}</p>
+                                    <h4 className="font-bold text-navy-900 line-clamp-1">{topThree[1].name}</h4>
+                                    <p className="text-[10px] text-navy-400 font-black uppercase tracking-widest line-clamp-1">{topThree[1].centre}</p>
                                     <p className="text-xl font-black text-navy-900 mt-2">{topThree[1].count.toLocaleString()}</p>
                                 </div>
                             </div>
@@ -249,8 +268,8 @@ const LeaderboardPage: React.FC = () => {
                                     <div className="absolute -bottom-2 -right-2 w-12 h-12 bg-gold-500 border-4 border-white text-navy-900 rounded-full flex items-center justify-center font-black shadow-xl">1</div>
                                 </div>
                                 <div className="text-center">
-                                    <h4 className="text-xl font-bold text-navy-900">{topThree[0].name}</h4>
-                                    <p className="text-xs text-navy-400 font-black uppercase tracking-widest">{topThree[0].centre}</p>
+                                    <h4 className="text-xl font-bold text-navy-900 line-clamp-1">{topThree[0].name}</h4>
+                                    <p className="text-xs text-navy-400 font-black uppercase tracking-widest line-clamp-1">{topThree[0].centre}</p>
                                     <p className="text-3xl font-black text-gold-600 mt-2 shadow-gold-500/10">{topThree[0].count.toLocaleString()}</p>
                                 </div>
                             </div>
@@ -266,8 +285,8 @@ const LeaderboardPage: React.FC = () => {
                                     <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-orange-50 border-4 border-white text-orange-700 rounded-full flex items-center justify-center font-black shadow-md">3</div>
                                 </div>
                                 <div className="text-center">
-                                    <h4 className="font-bold text-navy-900">{topThree[2].name}</h4>
-                                    <p className="text-[10px] text-navy-400 font-black uppercase tracking-widest">{topThree[2].centre}</p>
+                                    <h4 className="font-bold text-navy-900 line-clamp-1">{topThree[2].name}</h4>
+                                    <p className="text-[10px] text-navy-400 font-black uppercase tracking-widest line-clamp-1">{topThree[2].centre}</p>
                                     <p className="text-xl font-black text-navy-900 mt-2">{topThree[2].count.toLocaleString()}</p>
                                 </div>
                             </div>

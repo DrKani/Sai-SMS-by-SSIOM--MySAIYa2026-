@@ -8,7 +8,7 @@ import { UserBriefcaseItem, UserProfile } from '../types';
 import { ToastContainer, useToast } from '../components/Toast';
 import confetti from 'canvas-confetti';
 import Skeleton from '../components/Skeleton';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { subscribeToNationalStats, NationalStats } from '../lib/nationalStats';
 
@@ -21,6 +21,14 @@ const DashboardPage: React.FC = () => {
     mantras: 0,
     booksRead: 0,
     streak: 0
+  });
+
+  const [timeframe, setTimeframe] = useState<'today' | 'week' | 'month' | 'all-time'>('all-time');
+  const [timeframeStats, setTimeframeStats] = useState({
+    gayathri: 0,
+    saiGayathri: 0,
+    likitha: 0,
+    mantras: 0
   });
   const [nationalStats, setNationalStats] = useState<NationalStats | null>(null);
   const [completedWeeks, setCompletedWeeks] = useState<string[]>([]);
@@ -112,11 +120,74 @@ const DashboardPage: React.FC = () => {
     };
   }, [location.state]);
 
+  // Fetch Timeframe Stats Whenever Timeframe changes
+  useEffect(() => {
+    if (!user || timeframe === 'all-time') {
+      setTimeframeStats({
+        gayathri: stats.gayathri,
+        saiGayathri: stats.saiGayathri,
+        likitha: stats.likitha,
+        mantras: stats.mantras
+      });
+      return;
+    }
+
+    const fetchTimeframeData = async () => {
+      try {
+        const q = query(collection(db, 'sadhanaDaily'), where('userId', '==', user.uid));
+        const snap = await getDocs(q);
+
+        const now = new Date();
+        const todayStr = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+
+        const currentWeekStart = new Date(now);
+        currentWeekStart.setDate(currentWeekStart.getDate() - currentWeekStart.getDay());
+        const weekStartStr = currentWeekStart.toISOString().split('T')[0];
+
+        const currentMonthPrefix = todayStr.substring(0, 7); // YYYY-MM
+
+        let tg = 0, tsg = 0, tl = 0, tm = 0;
+
+        snap.docs.forEach(d => {
+          const data = d.data();
+          const targetDate = data.date; // string YYYY-MM-DD
+          let include = false;
+
+          if (timeframe === 'today' && targetDate === todayStr) {
+            include = true;
+          } else if (timeframe === 'week' && targetDate >= weekStartStr && targetDate <= todayStr) {
+            include = true;
+          } else if (timeframe === 'month' && targetDate.startsWith(currentMonthPrefix)) {
+            include = true;
+          }
+
+          if (include) {
+            tg += data.gayathri || 0;
+            tsg += data.saiGayathri || 0;
+            tl += data.likitha || 0;
+            tm += data.mantras || 0;
+          }
+        });
+
+        setTimeframeStats({
+          gayathri: tg,
+          saiGayathri: tsg,
+          likitha: tl,
+          mantras: tm
+        });
+      } catch (err) {
+        console.error("Error fetching timeframe stats:", err);
+      }
+    };
+
+    fetchTimeframeData();
+  }, [timeframe, user, stats]); // re-run if all-time stats update
+
   const chartData = [
-    { name: 'Gayathri', value: stats.gayathri, color: '#ea7600' },
-    { name: 'S.S. Gayathri', value: stats.saiGayathri, color: '#bf0449' },
-    { name: 'Mantras', value: stats.mantras, color: '#5726bf' },
-    { name: 'Likitha', value: stats.likitha * 11, color: '#1d4ed8' },
+    { name: 'Gayathri', value: timeframeStats.gayathri, color: '#ea7600' },
+    { name: 'S.S. Gayathri', value: timeframeStats.saiGayathri, color: '#bf0449' },
+    { name: 'Mantras', value: timeframeStats.mantras, color: '#5726bf' },
+    { name: 'Likitha', value: timeframeStats.likitha * 11, color: '#1d4ed8' },
   ];
 
   if (isLoading) {
@@ -223,7 +294,21 @@ const DashboardPage: React.FC = () => {
         <div className="lg:col-span-2 space-y-8">
           {/* Namasmarana Chart */}
           <div className="bg-white p-10 rounded-bento shadow-xl border border-navy-50">
-            <h3 className="text-2xl font-serif font-bold text-navy-900 mb-8">Namasmarana Distribution</h3>
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+              <h3 className="text-2xl font-serif font-bold text-navy-900">Namasmarana Distribution</h3>
+              <div className="flex bg-neutral-100 p-1 rounded-xl">
+                {(['today', 'week', 'month', 'all-time'] as const).map(t => (
+                  <button
+                    key={t}
+                    onClick={() => setTimeframe(t)}
+                    className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${timeframe === t ? 'bg-white text-navy-900 shadow border border-navy-50' : 'text-navy-400 hover:text-navy-900'}`}
+                  >
+                    {t.replace('-', ' ')}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="h-64 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData}>
@@ -289,15 +374,15 @@ const DashboardPage: React.FC = () => {
         <div className="space-y-8">
           <div id="tutorial-dashboard" className="bg-navy-900 p-10 rounded-bento text-white shadow-2xl relative overflow-hidden">
             <div className="absolute top-0 right-0 p-10 opacity-10"><Activity size={120} /></div>
-            <h3 className="text-xl font-bold mb-6 text-gold-500">Sacred Summary</h3>
+            <h3 className="text-xl font-bold mb-6 text-gold-500">Sacred Summary {timeframe !== 'all-time' ? `(${timeframe})` : ''}</h3>
             <div className="space-y-6">
               <Link to="/namasmarana" className="flex justify-between items-center pb-4 border-b border-white/10 group cursor-pointer hover:bg-white/5 rounded-lg p-2 transition-colors">
                 <span className="text-xs text-navy-300 font-bold uppercase group-hover:text-gold-500 transition-colors">Total Chants</span>
-                <span className="text-2xl font-black text-gold-500">{(stats.gayathri + stats.saiGayathri + (stats.likitha * 11)).toLocaleString()}</span>
+                <span className="text-2xl font-black text-gold-500">{(timeframeStats.gayathri + timeframeStats.saiGayathri + (timeframeStats.likitha * 11)).toLocaleString()}</span>
               </Link>
               <Link to="/namasmarana" className="flex justify-between items-center pb-4 border-b border-white/10 group cursor-pointer hover:bg-white/5 rounded-lg p-2 transition-colors">
                 <span className="text-xs text-navy-300 font-bold uppercase group-hover:text-gold-500 transition-colors">Japam Units</span>
-                <span className="text-2xl font-black text-white">{stats.likitha}</span>
+                <span className="text-2xl font-black text-white">{timeframeStats.likitha}</span>
               </Link>
               <Link to="/book-club" className="flex justify-between items-center group cursor-pointer hover:bg-white/5 rounded-lg p-2 transition-colors">
                 <span className="text-xs text-navy-300 font-bold uppercase group-hover:text-gold-500 transition-colors">Chapters Read</span>
