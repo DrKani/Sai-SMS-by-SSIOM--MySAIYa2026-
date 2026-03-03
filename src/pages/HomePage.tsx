@@ -119,19 +119,37 @@ const HomePage: React.FC = () => {
       if (!cancelled) setGlobalStats(stats);
     });
 
-    // Fetch participants — fire-and-forget, failures are silent
+    // Fetch participants — cached in sessionStorage (5-min TTL) to avoid
+    // repeated Firestore reads on every home page visit.
     (async () => {
+      const CACHE_KEY = 'sms_home_participants';
+      const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+      try {
+        const raw = sessionStorage.getItem(CACHE_KEY);
+        if (raw) {
+          const { data, ts } = JSON.parse(raw);
+          if (Date.now() - ts < CACHE_TTL && Array.isArray(data)) {
+            if (!cancelled) setRecentParticipants(data);
+            return;
+          }
+        }
+      } catch { /* cache miss */ }
+
       try {
         const snap = await getDocs(
           query(collection(db, 'users'), where('publicLeaderboard', '==', true), limit(12))
         );
         if (!cancelled) {
-          setRecentParticipants(snap.docs.map(d => ({
+          const participants = snap.docs.map(d => ({
             name: d.data().name,
             centre: d.data().centre,
             photoURL: d.data().photoURL,
             gender: d.data().gender || 'male',
-          })));
+          }));
+          setRecentParticipants(participants);
+          try {
+            sessionStorage.setItem(CACHE_KEY, JSON.stringify({ data: participants, ts: Date.now() }));
+          } catch { /* quota — ignore */ }
         }
       } catch { /* silent — Firebase permission denied handled gracefully */ }
     })();

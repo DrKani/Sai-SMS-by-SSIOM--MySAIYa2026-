@@ -17,18 +17,47 @@ export interface NationalStats {
 const STATS_DOC_PATH = 'metadata/national_stats';
 const PARTICIPANTS_COLLECTION = 'metadata/national_stats/participants';
 
+// ── Participant cache ─────────────────────────────────────────────────────────
+// Avoids a getDoc read on every chant submission after the first one per user.
+const PARTICIPANT_CACHE_KEY = 'sms_known_participant';
+const _knownParticipants: Set<string> = (() => {
+    try {
+        const stored = localStorage.getItem(PARTICIPANT_CACHE_KEY);
+        return new Set<string>(stored ? JSON.parse(stored) : []);
+    } catch { return new Set<string>(); }
+})();
+
+function cacheParticipant(uid: string): void {
+    _knownParticipants.add(uid);
+    try {
+        localStorage.setItem(PARTICIPANT_CACHE_KEY, JSON.stringify([..._knownParticipants]));
+    } catch { /* quota exceeded — ignore */ }
+}
+
 /**
  * Increments national and state-wise stats in Firestore.
  * Handles participant counting by checking a sub-collection.
+ * Uses an in-memory + localStorage cache so the participant-check read
+ * only happens once per user (instead of on every single submission).
  */
 export const recordSadhanaOffering = async (uid: string, state: string, chantCount: number) => {
     try {
         const statsRef = doc(db, STATS_DOC_PATH);
-        const participantRef = doc(db, PARTICIPANTS_COLLECTION, uid);
 
-        // 1. Check if participant already recorded
-        const participantSnap = await getDoc(participantRef);
-        const isNewParticipant = !participantSnap.exists();
+        // 1. Determine if participant is new (cached → skip Firestore read)
+        let isNewParticipant = false;
+        if (!_knownParticipants.has(uid)) {
+            const participantRef = doc(db, PARTICIPANTS_COLLECTION, uid);
+            const participantSnap = await getDoc(participantRef);
+            if (participantSnap.exists()) {
+                // Already recorded in Firestore — cache it locally
+                cacheParticipant(uid);
+            } else {
+                isNewParticipant = true;
+                await setDoc(participantRef, { addedAt: new Date().toISOString() });
+                cacheParticipant(uid);
+            }
+        }
 
         // 2. Prepare updates
         const updates: any = {
@@ -40,8 +69,6 @@ export const recordSadhanaOffering = async (uid: string, state: string, chantCou
         if (isNewParticipant) {
             updates.totalParticipants = increment(1);
             updates[`states.${state}.participants`] = increment(1);
-            // Mark participant as recorded
-            await setDoc(participantRef, { addedAt: new Date().toISOString() });
         }
 
         // 3. Update main stats doc

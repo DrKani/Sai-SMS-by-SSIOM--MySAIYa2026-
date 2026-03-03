@@ -29,6 +29,8 @@ const SaiAvatar: React.FC<SaiAvatarProps> = ({ gender, photoURL, size = 64, clas
         <img
           src={imageUrl}
           alt={`${gender} avatar`}
+          loading="lazy"
+          decoding="async"
           className="w-full h-full object-cover"
           onError={(e) => {
             // Fallback to DiceBear if the provided link (e.g. google photos share link) fails to load as an image
