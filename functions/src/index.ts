@@ -171,7 +171,6 @@ export const dailyOrchestrator = functions.pubsub
             const snapshot = await usersRef.get(); // In a large app, we'd use a query or batching
 
             const now = Date.now();
-            const ONE_DAY = 24 * 60 * 60 * 1000;
             const TWO_DAYS = 48 * 60 * 60 * 1000;
 
             let resetCount = 0;
