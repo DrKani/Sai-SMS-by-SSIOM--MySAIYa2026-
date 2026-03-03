@@ -13,7 +13,8 @@ import {
    Save, UserPlus, GraduationCap, Info, Gamepad2, Layers, BarChart2,
    ListFilter, Target, History, Lightbulb, ExternalLink, Video,
    ArrowRight, PenTool, HelpCircle, MessageSquare, Repeat, Smartphone, Sparkles, Megaphone,
-   Trophy, Type, Home, Mic, UserCog, Ban, Key, Map as MapIcon, Quote
+   Trophy, Type, Home, Mic, UserCog, Ban, Key, Map as MapIcon, Quote,
+   TrendingUp, BarChart3, Vote, ToggleLeft, ToggleRight, PlusCircle, ChevronDown
 } from 'lucide-react';
 import {
    ANNUAL_STUDY_PLAN,
@@ -31,14 +32,16 @@ import {
    BookClubQuizQuestion,
    Event as SmsEvent,
    BrandingConfig,
-   SiteContent
+   SiteContent,
+   Poll,
+   PollVote
 } from '../types';
 import SaiAvatar from '../components/SaiAvatar';
 import {
    BarChart as ReBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
    PieChart as RePieChart, Pie, Sector, LineChart, Line, Legend, RadialBarChart, RadialBar
 } from 'recharts';
-import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc, addDoc, query, where, orderBy, limit, Timestamp, onSnapshot, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import Papa from 'papaparse';
 
@@ -64,6 +67,20 @@ const Card = ({ children, className = "" }: { children?: React.ReactNode, classN
 
 // --- MODULES ---
 
+const EXPORT_COLUMNS = [
+   { key: 'UID',        label: 'UID',          defaultOn: false },
+   { key: 'Name',       label: 'Name',         defaultOn: true  },
+   { key: 'Email',      label: 'Email',        defaultOn: true  },
+   { key: 'Gender',     label: 'Gender',       defaultOn: true  },
+   { key: 'State',      label: 'State/Region', defaultOn: true  },
+   { key: 'Centre',     label: 'Sai Centre',   defaultOn: true  },
+   { key: 'IsAdmin',    label: 'Is Admin',     defaultOn: true  },
+   { key: 'IsGuest',    label: 'Is Guest',     defaultOn: false },
+   { key: 'JoinedAt',   label: 'Joined At',    defaultOn: true  },
+   { key: 'TotalChants',label: 'Total Chants', defaultOn: true  },
+   { key: 'OnboardedApp',label: 'Onboarded',  defaultOn: false },
+];
+
 // 7. USER REGISTRY & ROLE MANAGER
 const UserRegistry = ({ adminEmail }: { adminEmail: string }) => {
    const [users, setUsers] = useState<UserProfile[]>([]);
@@ -73,6 +90,12 @@ const UserRegistry = ({ adminEmail }: { adminEmail: string }) => {
    const [activeTab, setActiveTab] = useState<'registry' | 'analytics'>('registry');
    const [isLoading, setIsLoading] = useState(true);
    const [loadError, setLoadError] = useState<string | null>(null);
+   const [exportDateFrom, setExportDateFrom] = useState('');
+   const [exportDateTo, setExportDateTo] = useState('');
+   const [showExportSettings, setShowExportSettings] = useState(false);
+   const [selectedColumns, setSelectedColumns] = useState<Record<string, boolean>>(
+      () => Object.fromEntries(EXPORT_COLUMNS.map(c => [c.key, c.defaultOn]))
+   );
 
    useEffect(() => {
       loadRegistry();
@@ -196,20 +219,37 @@ const UserRegistry = ({ adminEmail }: { adminEmail: string }) => {
    });
 
    const handleExportCSV = () => {
-      const exportData = filteredUsers.map(u => ({
+      let usersToExport = [...filteredUsers];
+      if (exportDateFrom) {
+         usersToExport = usersToExport.filter(u => u.joinedAt && new Date(u.joinedAt) >= new Date(exportDateFrom));
+      }
+      if (exportDateTo) {
+         usersToExport = usersToExport.filter(u => u.joinedAt && new Date(u.joinedAt) <= new Date(exportDateTo + 'T23:59:59'));
+      }
+      if (usersToExport.length === 0) {
+         alert('No records match the selected filters.');
+         return;
+      }
+      const allRows = usersToExport.map(u => ({
          UID: u.uid,
          Name: u.name,
-         Email: u.email,
+         Email: u.email || '',
          Gender: u.gender || '',
          State: u.state || '',
          Centre: u.centre || '',
          IsAdmin: u.isAdmin ? 'Yes' : 'No',
          IsGuest: u.isGuest ? 'Yes' : 'No',
-         JoinedAt: new Date(u.joinedAt).toLocaleString(),
+         JoinedAt: u.joinedAt ? new Date(u.joinedAt).toLocaleString() : '',
          TotalChants: userStats[u.uid] || 0,
-         OnboardedApp: u.onboardedApp ? 'Yes' : 'No'
+         OnboardedApp: u.onboardedApp ? 'Yes' : 'No',
       }));
-
+      const exportData = allRows.map(row => {
+         const out: Record<string, any> = {};
+         EXPORT_COLUMNS.forEach(col => {
+            if (selectedColumns[col.key]) out[col.label] = (row as any)[col.key];
+         });
+         return out;
+      });
       const csv = Papa.unparse(exportData);
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
@@ -220,6 +260,7 @@ const UserRegistry = ({ adminEmail }: { adminEmail: string }) => {
       link.click();
       document.body.removeChild(link);
       logAdminAction(adminEmail, 'Exported Registry CSV', `${exportData.length} records`);
+      setShowExportSettings(false);
    };
 
    return (
@@ -257,11 +298,43 @@ const UserRegistry = ({ adminEmail }: { adminEmail: string }) => {
                            {role}
                         </button>
                      ))}
-                     <button onClick={handleExportCSV} className="px-4 py-2 bg-gold-50 text-gold-700 border border-gold-200 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-gold-100 transition-colors">
-                        <Download size={14} /> Export CSV
+                     <button onClick={() => setShowExportSettings(s => !s)} className="px-4 py-2 bg-gold-50 text-gold-700 border border-gold-200 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-gold-100 transition-colors">
+                        <Download size={14} /> Export CSV <ChevronDown size={12} className={`transition-transform ${showExportSettings ? 'rotate-180' : ''}`} />
                      </button>
                   </div>
                </div>
+
+               {showExportSettings && (
+                  <div className="p-6 bg-gold-50/50 border-b border-gold-200 space-y-4">
+                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                        <div className="space-y-1">
+                           <label className="text-[10px] font-black uppercase text-navy-400">Joined From</label>
+                           <input type="date" className="w-full p-2 bg-white border border-navy-100 rounded-xl text-sm focus:border-gold-500 outline-none" value={exportDateFrom} onChange={e => setExportDateFrom(e.target.value)} />
+                        </div>
+                        <div className="space-y-1">
+                           <label className="text-[10px] font-black uppercase text-navy-400">Joined To</label>
+                           <input type="date" className="w-full p-2 bg-white border border-navy-100 rounded-xl text-sm focus:border-gold-500 outline-none" value={exportDateTo} onChange={e => setExportDateTo(e.target.value)} />
+                        </div>
+                        <button onClick={handleExportCSV} className="py-2 px-6 bg-gold-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gold-600 transition-all flex items-center justify-center gap-2 shadow-md">
+                           <Download size={14} /> Download {filteredUsers.length} Records
+                        </button>
+                     </div>
+                     <div>
+                        <p className="text-[10px] font-black uppercase text-navy-400 mb-2">Columns to Include</p>
+                        <div className="flex flex-wrap gap-2">
+                           {EXPORT_COLUMNS.map(col => (
+                              <button
+                                 key={col.key}
+                                 onClick={() => setSelectedColumns(prev => ({ ...prev, [col.key]: !prev[col.key] }))}
+                                 className={`px-3 py-1 rounded-full text-[10px] font-black uppercase border transition-all ${selectedColumns[col.key] ? 'bg-navy-900 text-white border-navy-900' : 'bg-white text-navy-400 border-navy-100'}`}
+                              >
+                                 {col.label}
+                              </button>
+                           ))}
+                        </div>
+                     </div>
+                  </div>
+               )}
 
                <div className="overflow-x-auto">
                   <table className="w-full text-left">
@@ -1522,6 +1595,567 @@ const BookClubAnalytics: React.FC = () => {
    );
 };
 
+// --- PLATFORM ANALYTICS DASHBOARD ---
+
+const PlatformAnalytics: React.FC = () => {
+   const [loading, setLoading] = useState(true);
+   const [totalUsers, setTotalUsers] = useState(0);
+   const [dauToday, setDauToday] = useState(0);
+   const [wauLast7, setWauLast7] = useState(0);
+   const [totalChants, setTotalChants] = useState(0);
+   const [regionData, setRegionData] = useState<{ name: string; members: number; chants: number }[]>([]);
+   const [centreData, setCentreData] = useState<{ name: string; members: number }[]>([]);
+   const [joinTrend, setJoinTrend] = useState<{ month: string; count: number }[]>([]);
+
+   useEffect(() => {
+      const fetchAll = async () => {
+         setLoading(true);
+         try {
+            // 1. Users collection — totals, region, centre, join trend
+            const usersSnap = await getDocs(collection(db, 'users'));
+            const allUsers = usersSnap.docs.map(d => d.data() as UserProfile);
+            setTotalUsers(allUsers.length);
+
+            const regionMap: Record<string, number> = {};
+            const centreMap: Record<string, number> = {};
+            const monthMap: Record<string, number> = {};
+            allUsers.forEach(u => {
+               if (u.state) regionMap[u.state] = (regionMap[u.state] || 0) + 1;
+               if (u.centre) centreMap[u.centre] = (centreMap[u.centre] || 0) + 1;
+               if (u.joinedAt) {
+                  const d = new Date(u.joinedAt);
+                  const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                  monthMap[key] = (monthMap[key] || 0) + 1;
+               }
+            });
+
+            const rData = Object.entries(regionMap)
+               .map(([name, members]) => ({ name, members, chants: 0 }))
+               .sort((a, b) => b.members - a.members);
+            const cData = Object.entries(centreMap)
+               .map(([name, members]) => ({ name, members }))
+               .sort((a, b) => b.members - a.members)
+               .slice(0, 12);
+            const trend = Object.entries(monthMap)
+               .sort(([a], [b]) => a.localeCompare(b))
+               .slice(-6)
+               .map(([month, count]) => ({
+                  month: new Date(month + '-01').toLocaleDateString('en', { month: 'short', year: '2-digit' }),
+                  count
+               }));
+            setRegionData(rData);
+            setCentreData(cData);
+            setJoinTrend(trend);
+
+            // 2. DAU / WAU from sadhanaDaily
+            const todayStr = new Date().toISOString().split('T')[0];
+            const weekAgoStr = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+            try {
+               const dailySnap = await getDocs(
+                  query(collection(db, 'sadhanaDaily'), where('date', '>=', weekAgoStr))
+               );
+               const activeToday = new Set<string>();
+               const activeWeek = new Set<string>();
+               dailySnap.docs.forEach(d => {
+                  const data = d.data();
+                  if (data.uid && data.date) {
+                     activeWeek.add(data.uid);
+                     if (data.date >= todayStr) activeToday.add(data.uid);
+                  }
+               });
+               setDauToday(activeToday.size);
+               setWauLast7(activeWeek.size);
+            } catch (e) {
+               console.warn('PlatformAnalytics: sadhanaDaily query failed', e);
+            }
+
+            // 3. National stats for total chants + state chant data
+            try {
+               const statsDoc = await getDoc(doc(db, 'metadata', 'national_stats'));
+               if (statsDoc.exists()) {
+                  const data = statsDoc.data();
+                  setTotalChants(data.totalChants || 0);
+                  if (data.states) {
+                     setRegionData(prev => prev.map(r => {
+                        const s = data.states[r.name];
+                        return s ? { ...r, chants: s.chants || 0 } : r;
+                     }));
+                  }
+               }
+            } catch (e) {
+               console.warn('PlatformAnalytics: national_stats fetch failed', e);
+            }
+         } catch (err) {
+            console.error('PlatformAnalytics fetch error', err);
+         } finally {
+            setLoading(false);
+         }
+      };
+      fetchAll();
+   }, []);
+
+   const kpiCards = [
+      { label: 'Total Registered', value: loading ? '…' : totalUsers.toLocaleString(), icon: <Users size={22} />, color: 'text-blue-600', bg: 'bg-blue-50' },
+      { label: 'Active Today (DAU)', value: loading ? '…' : dauToday.toLocaleString(), icon: <Activity size={22} />, color: 'text-green-600', bg: 'bg-green-50' },
+      { label: 'Active This Week (WAU)', value: loading ? '…' : wauLast7.toLocaleString(), icon: <TrendingUp size={22} />, color: 'text-purple-600', bg: 'bg-purple-50' },
+      { label: 'Total Chants', value: loading ? '…' : totalChants.toLocaleString(), icon: <Heart size={22} />, color: 'text-gold-600', bg: 'bg-gold-50' },
+   ];
+
+   return (
+      <div className="space-y-8 animate-in fade-in">
+         <div>
+            <h2 className="text-3xl font-serif font-bold text-navy-900">Platform Analytics</h2>
+            <p className="text-sm text-navy-400">Live engagement metrics from Firestore.</p>
+         </div>
+
+         {/* KPI Cards */}
+         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            {kpiCards.map((c, i) => (
+               <Card key={i} className="p-6">
+                  <div className={`w-10 h-10 ${c.bg} ${c.color} rounded-xl flex items-center justify-center mb-4`}>
+                     {c.icon}
+                  </div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-navy-300 mb-1">{c.label}</p>
+                  <p className="text-3xl font-bold text-navy-900">{c.value}</p>
+               </Card>
+            ))}
+         </div>
+
+         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Regional Member Distribution */}
+            <Card className="p-8">
+               <h3 className="text-lg font-bold text-navy-900 mb-6 flex items-center gap-2">
+                  <MapIcon size={20} className="text-gold-500" /> Regional Distribution
+               </h3>
+               <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                     <ReBarChart data={regionData.slice(0, 9)} layout="vertical">
+                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#eee" />
+                        <XAxis type="number" hide />
+                        <YAxis dataKey="name" type="category" width={150} tick={{ fontSize: 10 }} />
+                        <Tooltip />
+                        <Bar dataKey="members" name="Members" fill="#002E5B" radius={[0, 4, 4, 0]} barSize={16} />
+                     </ReBarChart>
+                  </ResponsiveContainer>
+               </div>
+            </Card>
+
+            {/* New Member Join Trend */}
+            <Card className="p-8">
+               <h3 className="text-lg font-bold text-navy-900 mb-6 flex items-center gap-2">
+                  <BarChart3 size={20} className="text-blue-500" /> New Signups (Last 6 Months)
+               </h3>
+               <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                     <LineChart data={joinTrend}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+                        <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+                        <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
+                        <Tooltip />
+                        <Line type="monotone" dataKey="count" name="New Members" stroke="#D2AC47" strokeWidth={2} dot={{ fill: '#D2AC47', r: 4 }} />
+                     </LineChart>
+                  </ResponsiveContainer>
+               </div>
+            </Card>
+         </div>
+
+         {/* Region + Chants Table */}
+         {regionData.length > 0 && (
+            <Card>
+               <div className="p-6 border-b border-navy-50">
+                  <h3 className="font-bold text-navy-900 flex items-center gap-2">
+                     <Activity size={18} className="text-gold-500" /> Region Activity Summary
+                  </h3>
+               </div>
+               <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                     <thead className="bg-neutral-50 text-[10px] font-black uppercase tracking-widest text-navy-400">
+                        <tr>
+                           <th className="text-left p-4">Region</th>
+                           <th className="text-center p-4">Members</th>
+                           <th className="text-center p-4">Total Chants</th>
+                           <th className="text-center p-4">Avg Chants / Member</th>
+                        </tr>
+                     </thead>
+                     <tbody>
+                        {regionData.map((r, i) => (
+                           <tr key={i} className="border-t border-navy-50 hover:bg-neutral-50">
+                              <td className="p-4 font-medium text-navy-900">{r.name}</td>
+                              <td className="p-4 text-center text-navy-600">{r.members}</td>
+                              <td className="p-4 text-center font-bold text-gold-700">{r.chants.toLocaleString()}</td>
+                              <td className="p-4 text-center text-navy-500">
+                                 {r.members > 0 ? Math.round(r.chants / r.members).toLocaleString() : '—'}
+                              </td>
+                           </tr>
+                        ))}
+                     </tbody>
+                  </table>
+               </div>
+            </Card>
+         )}
+
+         {/* Sai Centre Breakdown */}
+         {centreData.length > 0 && (
+            <Card className="p-8">
+               <h3 className="text-lg font-bold text-navy-900 mb-6 flex items-center gap-2">
+                  <Users size={20} className="text-purple-500" /> Sai Centre Membership
+               </h3>
+               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                  {centreData.map((c, i) => (
+                     <div key={i} className="text-center p-4 bg-neutral-50 rounded-2xl">
+                        <p className="text-2xl font-black text-navy-900">{c.members}</p>
+                        <p className="text-[10px] font-bold text-navy-400 uppercase mt-1 truncate" title={c.name}>{c.name}</p>
+                     </div>
+                  ))}
+               </div>
+            </Card>
+         )}
+      </div>
+   );
+};
+
+// --- POLL & SURVEY MANAGER ---
+
+const POLL_COLORS = ['#002E5B', '#D2AC47', '#C2195B', '#5726bf', '#00897B', '#f57c00'];
+
+const PollManager: React.FC<{ adminEmail: string }> = ({ adminEmail }) => {
+   const [polls, setPolls] = useState<Poll[]>([]);
+   const [votes, setVotes] = useState<Record<string, PollVote[]>>({});
+   const [loading, setLoading] = useState(true);
+   const [selectedPollId, setSelectedPollId] = useState<string | null>(null);
+   const [isCreating, setIsCreating] = useState(false);
+   const [isSaving, setIsSaving] = useState(false);
+   const [newPoll, setNewPoll] = useState<{
+      question: string;
+      options: string[];
+      multipleChoice: boolean;
+      expiresAt: string;
+   }>({
+      question: '',
+      options: ['', ''],
+      multipleChoice: false,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+   });
+
+   const loadPolls = async () => {
+      setLoading(true);
+      try {
+         const snap = await getDocs(query(collection(db, 'polls'), orderBy('createdAt', 'desc')));
+         const loadedPolls = snap.docs.map(d => ({ pollId: d.id, ...d.data() } as Poll));
+         setPolls(loadedPolls);
+
+         const allVotes: Record<string, PollVote[]> = {};
+         for (const p of loadedPolls) {
+            try {
+               const vSnap = await getDocs(collection(db, 'polls', p.pollId, 'votes'));
+               allVotes[p.pollId] = vSnap.docs.map(d => ({ voteId: d.id, ...d.data() } as PollVote));
+            } catch { /* no votes yet is fine */ }
+         }
+         setVotes(allVotes);
+      } catch (err) {
+         console.error('PollManager: load error', err);
+      } finally {
+         setLoading(false);
+      }
+   };
+
+   useEffect(() => { loadPolls(); }, []);
+
+   const createPoll = async () => {
+      const validOptions = newPoll.options.filter(o => o.trim());
+      if (!newPoll.question.trim() || validOptions.length < 2) {
+         alert('Provide a question and at least 2 options.');
+         return;
+      }
+      setIsSaving(true);
+      try {
+         const pollData: Omit<Poll, 'pollId'> = {
+            question: newPoll.question.trim(),
+            options: validOptions,
+            multipleChoice: newPoll.multipleChoice,
+            expiresAt: new Date(newPoll.expiresAt + 'T23:59:59').toISOString(),
+            createdAt: new Date().toISOString(),
+            createdBy: adminEmail,
+            status: 'active',
+         };
+         await addDoc(collection(db, 'polls'), pollData);
+         logAdminAction(adminEmail, 'Created Poll', pollData.question);
+         setIsCreating(false);
+         setNewPoll({ question: '', options: ['', ''], multipleChoice: false, expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] });
+         await loadPolls();
+      } catch (err: any) {
+         alert(`Failed to create poll: ${err.message}`);
+      } finally {
+         setIsSaving(false);
+      }
+   };
+
+   const toggleStatus = async (poll: Poll) => {
+      const newStatus = poll.status === 'active' ? 'closed' : 'active';
+      try {
+         await updateDoc(doc(db, 'polls', poll.pollId), { status: newStatus });
+         setPolls(prev => prev.map(p => p.pollId === poll.pollId ? { ...p, status: newStatus } : p));
+         logAdminAction(adminEmail, `Poll ${newStatus === 'active' ? 'Reopened' : 'Closed'}`, poll.question);
+      } catch (err: any) {
+         alert(`Failed: ${err.message}`);
+      }
+   };
+
+   const deletePoll = async (poll: Poll) => {
+      if (!window.confirm('Delete this poll and all its votes?')) return;
+      try {
+         await deleteDoc(doc(db, 'polls', poll.pollId));
+         setPolls(prev => prev.filter(p => p.pollId !== poll.pollId));
+         if (selectedPollId === poll.pollId) setSelectedPollId(null);
+         logAdminAction(adminEmail, 'Deleted Poll', poll.question);
+      } catch (err: any) {
+         alert(`Failed: ${err.message}`);
+      }
+   };
+
+   const selectedPoll = polls.find(p => p.pollId === selectedPollId) || null;
+   const selectedVotes = selectedPollId ? (votes[selectedPollId] || []) : [];
+
+   const getVoteData = (poll: Poll) => {
+      const pv = votes[poll.pollId] || [];
+      return poll.options.map((opt, idx) => {
+         const count = pv.filter(v => v.selectedOptions.includes(idx)).length;
+         return { option: opt.length > 30 ? opt.slice(0, 28) + '…' : opt, fullOption: opt, votes: count, pct: pv.length > 0 ? Math.round(count / pv.length * 100) : 0 };
+      });
+   };
+
+   return (
+      <div className="space-y-8 animate-in fade-in">
+         <div className="flex justify-between items-end">
+            <div>
+               <h2 className="text-3xl font-serif font-bold text-navy-900">Poll & Survey Manager</h2>
+               <p className="text-sm text-navy-400">Create polls, collect community responses, and analyse results.</p>
+            </div>
+            <button onClick={() => setIsCreating(true)} className="px-6 py-3 bg-navy-900 text-white rounded-xl font-black uppercase text-[10px] shadow-lg hover:bg-navy-800 transition-all flex items-center gap-2">
+               <Plus size={16} /> New Poll
+            </button>
+         </div>
+
+         {/* Create Poll Modal */}
+         {isCreating && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-navy-900/80 backdrop-blur-sm p-4" onClick={() => setIsCreating(false)}>
+               <Card className="w-full max-w-lg p-8 space-y-6" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+                  <div className="flex justify-between items-center">
+                     <h3 className="text-xl font-bold text-navy-900">Create New Poll</h3>
+                     <button onClick={() => setIsCreating(false)} className="p-2 hover:bg-neutral-100 rounded-xl"><X size={20} /></button>
+                  </div>
+
+                  <div className="space-y-2">
+                     <label className="text-[10px] font-black uppercase text-navy-300">Question</label>
+                     <textarea
+                        className="w-full p-3 bg-neutral-50 rounded-xl border border-navy-50 text-sm h-20 resize-none focus:border-gold-500 outline-none"
+                        placeholder="What would you like to ask the community?"
+                        value={newPoll.question}
+                        onChange={e => setNewPoll({ ...newPoll, question: e.target.value })}
+                     />
+                  </div>
+
+                  <div className="space-y-2">
+                     <label className="text-[10px] font-black uppercase text-navy-300">Answer Options (min 2, max 6)</label>
+                     {newPoll.options.map((opt, i) => (
+                        <div key={i} className="flex gap-2">
+                           <input
+                              className="flex-grow p-3 bg-neutral-50 rounded-xl border border-navy-50 text-sm focus:border-gold-500 outline-none"
+                              placeholder={`Option ${i + 1}`}
+                              value={opt}
+                              onChange={e => {
+                                 const opts = [...newPoll.options];
+                                 opts[i] = e.target.value;
+                                 setNewPoll({ ...newPoll, options: opts });
+                              }}
+                           />
+                           {newPoll.options.length > 2 && (
+                              <button onClick={() => setNewPoll({ ...newPoll, options: newPoll.options.filter((_, idx) => idx !== i) })} className="p-3 text-red-400 hover:bg-red-50 rounded-xl"><X size={16} /></button>
+                           )}
+                        </div>
+                     ))}
+                     {newPoll.options.length < 6 && (
+                        <button onClick={() => setNewPoll({ ...newPoll, options: [...newPoll.options, ''] })} className="text-[10px] font-bold text-gold-600 uppercase tracking-widest hover:underline">+ Add Option</button>
+                     )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase text-navy-300">Expires On</label>
+                        <input
+                           type="date"
+                           className="w-full p-3 bg-neutral-50 rounded-xl border border-navy-50 text-sm focus:border-gold-500 outline-none"
+                           value={newPoll.expiresAt}
+                           onChange={e => setNewPoll({ ...newPoll, expiresAt: e.target.value })}
+                        />
+                     </div>
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase text-navy-300">Multiple Choice?</label>
+                        <button
+                           onClick={() => setNewPoll({ ...newPoll, multipleChoice: !newPoll.multipleChoice })}
+                           className={`w-full p-3 rounded-xl border-2 text-sm font-bold transition-all ${newPoll.multipleChoice ? 'bg-navy-900 text-white border-navy-900' : 'bg-white text-navy-400 border-navy-100'}`}
+                        >
+                           {newPoll.multipleChoice ? 'Yes — Multiple' : 'No — Single'}
+                        </button>
+                     </div>
+                  </div>
+
+                  <button
+                     onClick={createPoll}
+                     disabled={isSaving}
+                     className="w-full py-4 bg-gold-gradient text-navy-900 rounded-xl font-black uppercase text-[10px] shadow-lg hover:scale-105 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                     {isSaving ? <RefreshCw size={14} className="animate-spin" /> : <Send size={14} />}
+                     {isSaving ? 'Publishing…' : 'Publish Poll'}
+                  </button>
+               </Card>
+            </div>
+         )}
+
+         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Left: Poll List */}
+            <div className="space-y-4">
+               <p className="text-[9px] font-black uppercase tracking-[0.3em] text-navy-300 px-1">All Polls ({polls.length})</p>
+               {loading ? (
+                  <div className="p-8 text-center text-navy-300"><RefreshCw size={24} className="animate-spin mx-auto" /></div>
+               ) : polls.length === 0 ? (
+                  <Card className="p-8 text-center text-navy-300 text-sm italic">No polls yet. Create one above.</Card>
+               ) : polls.map(p => {
+                  const voteCount = (votes[p.pollId] || []).length;
+                  const isSelected = selectedPollId === p.pollId;
+                  return (
+                     <button
+                        key={p.pollId}
+                        onClick={() => setSelectedPollId(isSelected ? null : p.pollId)}
+                        className={`w-full text-left p-5 rounded-2xl border-2 transition-all bg-white ${isSelected ? 'border-navy-900 shadow-lg scale-[1.01]' : 'border-navy-50 hover:border-gold-300 hover:shadow-md'}`}
+                     >
+                        <div className="flex justify-between items-start gap-2 mb-2">
+                           <p className="text-sm font-bold text-navy-900 leading-tight flex-grow">{p.question}</p>
+                           <span className={`shrink-0 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest ${p.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-neutral-100 text-neutral-500'}`}>
+                              {p.status}
+                           </span>
+                        </div>
+                        <div className="flex flex-wrap gap-2 text-[10px] text-navy-400 font-bold">
+                           <span>{voteCount} votes</span>
+                           <span>•</span>
+                           <span>{p.options.length} options</span>
+                           <span>•</span>
+                           <span>Exp: {new Date(p.expiresAt).toLocaleDateString()}</span>
+                        </div>
+                     </button>
+                  );
+               })}
+            </div>
+
+            {/* Right: Results Panel */}
+            <div className="lg:col-span-2">
+               {!selectedPoll ? (
+                  <Card className="p-12 flex flex-col items-center justify-center text-center text-navy-300 min-h-[300px]">
+                     <BarChart3 size={40} className="mb-4 opacity-30" />
+                     <p className="font-bold text-sm">Select a poll to view results</p>
+                  </Card>
+               ) : (
+                  <Card className="p-8 space-y-8">
+                     {/* Poll Header */}
+                     <div className="flex justify-between items-start gap-4">
+                        <div className="flex-grow">
+                           <h3 className="text-xl font-bold text-navy-900 leading-tight">{selectedPoll.question}</h3>
+                           <p className="text-xs text-navy-400 mt-1">
+                              {selectedVotes.length} votes · {selectedPoll.multipleChoice ? 'Multiple choice' : 'Single choice'}
+                              {' · '}Expires {new Date(selectedPoll.expiresAt).toLocaleDateString()}
+                              {' · '}By {selectedPoll.createdBy}
+                           </p>
+                        </div>
+                        <div className="flex gap-2 shrink-0">
+                           <button
+                              onClick={() => toggleStatus(selectedPoll)}
+                              className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase border transition-all ${selectedPoll.status === 'active' ? 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100' : 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'}`}
+                           >
+                              {selectedPoll.status === 'active' ? 'Close Poll' : 'Reopen'}
+                           </button>
+                           <button onClick={() => deletePoll(selectedPoll)} className="px-3 py-2 bg-red-50 text-red-600 rounded-xl text-[10px] font-black uppercase border border-red-100 hover:bg-red-100 transition-all">
+                              Delete
+                           </button>
+                        </div>
+                     </div>
+
+                     {selectedVotes.length === 0 ? (
+                        <div className="py-12 text-center text-navy-300">
+                           <p className="text-sm italic">No votes recorded yet.</p>
+                        </div>
+                     ) : (
+                        <>
+                           {/* Bar Chart */}
+                           <div className="h-56">
+                              <ResponsiveContainer width="100%" height="100%">
+                                 <ReBarChart data={getVoteData(selectedPoll)} layout="vertical">
+                                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#eee" />
+                                    <XAxis type="number" domain={[0, selectedVotes.length]} tick={{ fontSize: 10 }} allowDecimals={false} />
+                                    <YAxis dataKey="option" type="category" width={160} tick={{ fontSize: 10 }} />
+                                    <Tooltip formatter={(val: any) => [val, 'Votes']} />
+                                    <Bar dataKey="votes" radius={[0, 6, 6, 0]} barSize={22}>
+                                       {getVoteData(selectedPoll).map((_, i) => (
+                                          <Cell key={i} fill={POLL_COLORS[i % POLL_COLORS.length]} />
+                                       ))}
+                                    </Bar>
+                                 </ReBarChart>
+                              </ResponsiveContainer>
+                           </div>
+
+                           {/* Option Breakdown */}
+                           <div className="space-y-3">
+                              {getVoteData(selectedPoll).map((d, i) => (
+                                 <div key={i} className="flex items-center gap-3">
+                                    <div className="w-3 h-3 rounded-sm shrink-0" style={{ background: POLL_COLORS[i % POLL_COLORS.length] }} />
+                                    <div className="flex-grow">
+                                       <div className="flex justify-between text-xs font-bold mb-1">
+                                          <span className="text-navy-900" title={d.fullOption}>{d.fullOption}</span>
+                                          <span className="text-navy-400 shrink-0 ml-2">{d.votes} ({d.pct}%)</span>
+                                       </div>
+                                       <div className="h-2 bg-neutral-100 rounded-full overflow-hidden">
+                                          <div className="h-full rounded-full transition-all duration-500" style={{ width: `${d.pct}%`, background: POLL_COLORS[i % POLL_COLORS.length] }} />
+                                       </div>
+                                    </div>
+                                 </div>
+                              ))}
+                           </div>
+                        </>
+                     )}
+
+                     {/* Export Votes */}
+                     {selectedVotes.length > 0 && (
+                        <button
+                           onClick={() => {
+                              const rows = selectedVotes.map(v => ({
+                                 VoteId: v.voteId,
+                                 UserId: v.uid,
+                                 UserName: v.userName,
+                                 SelectedOptions: v.selectedOptions.map(i => selectedPoll.options[i]).join('; '),
+                                 VotedAt: new Date(v.votedAt).toLocaleString(),
+                              }));
+                              const csv = Papa.unparse(rows);
+                              const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                              const url = URL.createObjectURL(blob);
+                              const link = document.createElement('a');
+                              link.href = url;
+                              link.setAttribute('download', `poll-votes-${selectedPoll.pollId}.csv`);
+                              document.body.appendChild(link);
+                              link.click();
+                              document.body.removeChild(link);
+                           }}
+                           className="flex items-center gap-2 text-[10px] font-black uppercase text-navy-400 hover:text-navy-900 transition-colors"
+                        >
+                           <Download size={14} /> Export Votes CSV
+                        </button>
+                     )}
+                  </Card>
+               )}
+            </div>
+         </div>
+      </div>
+   );
+};
+
 // --- MAIN PAGE ---
 
 const AdminPage: React.FC<{ user: UserProfile | null }> = ({ user }) => {
@@ -1613,6 +2247,8 @@ const AdminPage: React.FC<{ user: UserProfile | null }> = ({ user }) => {
                <AdminNavItem active={activeModule === 'reflections'} onClick={() => setActiveModule('reflections')} icon={<Quote size={20} />} label="Reflection Queue" />
                <AdminNavItem active={activeModule === 'sadhana'} onClick={() => setActiveModule('sadhana')} icon={<Activity size={20} />} label="Sadhana Analytics" />
                <AdminNavItem active={activeModule === 'bookclub_analytics'} onClick={() => setActiveModule('bookclub_analytics')} icon={<Trophy size={20} />} label="Book Club Analytics" />
+               <AdminNavItem active={activeModule === 'platform_analytics'} onClick={() => setActiveModule('platform_analytics')} icon={<BarChart3 size={20} />} label="Platform Analytics" />
+               <AdminNavItem active={activeModule === 'polls'} onClick={() => setActiveModule('polls')} icon={<Vote size={20} />} label="Polls & Surveys" />
                <div className="my-4 border-t border-navy-50"></div>
                <h4 className="text-[9px] font-black uppercase text-navy-200 tracking-[0.3em] px-6 mb-4">System</h4>
                <AdminNavItem active={activeModule === 'page_content'} onClick={() => setActiveModule('page_content')} icon={<Type size={20} />} label="Page Text" />
@@ -1629,6 +2265,8 @@ const AdminPage: React.FC<{ user: UserProfile | null }> = ({ user }) => {
                {activeModule === 'users' && <UserRegistry adminEmail={user?.email || 'admin'} />}
                {activeModule === 'reflections' && <ReflectionQueue adminEmail={user?.email || 'admin'} />}
                {activeModule === 'sadhana' && <SadhanaAnalytics />}
+               {activeModule === 'platform_analytics' && <PlatformAnalytics />}
+               {activeModule === 'polls' && <PollManager adminEmail={user?.email || 'admin'} />}
             </main>
          </div>
       </div>

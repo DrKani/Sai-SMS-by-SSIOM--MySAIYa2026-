@@ -204,6 +204,26 @@ export interface BrandingConfig {
   pwaIcon: string;
 }
 
+export interface Poll {
+  pollId: string;
+  question: string;
+  options: string[];
+  multipleChoice: boolean;
+  expiresAt: string; // ISO string
+  createdAt: string; // ISO string
+  createdBy: string; // admin email
+  status: 'active' | 'closed';
+}
+
+export interface PollVote {
+  voteId: string;
+  pollId: string;
+  uid: string;
+  userName: string;
+  selectedOptions: number[]; // array of option indices
+  votedAt: string; // ISO string
+}
+
 export interface SiteContent {
   homeWelcomeText: string;
   footerAboutText: string;

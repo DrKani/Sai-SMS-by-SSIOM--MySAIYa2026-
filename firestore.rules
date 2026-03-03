@@ -75,5 +75,28 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow write: if isAdmin();
     }
+
+    // --- Polls & Surveys ---
+    // Polls: admins manage, authenticated users can read active polls
+    match /polls/{pollId} {
+      allow read: if request.auth != null;
+      allow create, update, delete: if isAdmin();
+
+      // Votes subcollection: users can cast once, admins read all
+      match /votes/{voteId} {
+        allow read: if isAdmin();
+        allow create: if request.auth != null
+                      && request.resource.data.uid == request.auth.uid
+                      && request.resource.data.pollId == pollId;
+        // No update/delete — votes are immutable
+      }
+    }
+
+    // --- Reflections ---
+    match /reflections/{reflectionId} {
+      allow read: if request.auth != null && (resource.data.uid == request.auth.uid || isAdmin());
+      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
   }
 }
