@@ -389,7 +389,7 @@ const Layout: React.FC = () => {
           <EnhancedSearchBar searchQuery={searchQuery} setSearchQuery={setSearchQuery} isSearchOpen={isSearchOpen} setIsSearchOpen={setIsSearchOpen} searchResults={searchResults} onSelect={(link) => { navigate(link); setIsSearchOpen(false); setSearchQuery(""); }} placeholder="Search resources..." />
           <div className="flex items-center gap-2 lg:gap-4 shrink-0">
             <NotificationBell unreadCount={unreadCount} onClick={() => setIsNotifOpen(true)} />
-            {isAdmin && <Link to="/admin" className="btn-admin hidden lg:flex px-3 py-2 rounded-xl bg-purple-50 text-purple-700 font-black text-[10px] uppercase tracking-widest hover:bg-purple-100 transition-all items-center gap-2"><ShieldCheck size={14} /> Admin</Link>}
+            {isAdmin && <Link to="/admin" className="btn-admin hidden lg:flex items-center gap-2"><ShieldCheck size={14} /> Admin</Link>}
             <ProfileDropdown user={user} isAdmin={isAdmin} onLogout={() => setShowLogoutConfirm(true)} />
             <button onClick={() => setIsMenuOpen(true)} className="hamburger-btn p-2 min-h-[44px] min-w-[44px] text-navy-900 hover:text-purple-600 transition-colors flex items-center justify-center rounded-xl hover:bg-navy-50">
               <Menu size={28} /><span className="sr-only">Menu</span>
