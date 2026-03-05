@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'sai-sms-v2'; // Bump version to force update
+const CACHE_NAME = 'sai-sms-v3'; // Bump version to force update
 const ASSETS = [
   '/',
   '/index.html',

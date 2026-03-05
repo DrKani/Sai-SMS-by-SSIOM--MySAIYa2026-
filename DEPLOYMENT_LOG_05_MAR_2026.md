@@ -23,6 +23,8 @@ Short, human summary:
 - Added User Profile banner with Avatar, Name, and Centre in the drawer.
 - Restructured navigation lists with parent/child groups and custom icons.
 - Improved routing with #likitha support and nested About Us sections.
+- Bumped Service Worker to v3 to force cache update.
+- Verified Firebase configuration matches project `sai-sms-by-ssiom-mysaiya-2026`.
 
 ***
 
