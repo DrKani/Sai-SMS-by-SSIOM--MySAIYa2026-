@@ -7,7 +7,7 @@ import {
    Zap, Bell, X, PieChart as PieIcon, Users, Shield,
    ChevronRight, Search, Activity, HardDrive,
    Filter, CheckCircle2, XCircle, Star, Edit3, MessageCircle,
-   BarChart as BarChartIcon, Eye, Layout, Globe, Image as ImageIcon, Link as LinkIcon,
+   BarChart as BarChartIcon, Eye, EyeOff, Layout, Globe, Image as ImageIcon, Link as LinkIcon,
    Calendar, FileJson, ShieldAlert, ClipboardList, Settings, MoreVertical,
    CheckCheck, AlertTriangle, PlayCircle, Lock, Heart, Clock, Paperclip,
    Save, UserPlus, GraduationCap, Info, Gamepad2, Layers, BarChart2,
@@ -40,7 +40,7 @@ import {
    BarChart as ReBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
    PieChart as RePieChart, Pie, Sector, LineChart, Line, Legend, RadialBarChart, RadialBar
 } from 'recharts';
-import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc, addDoc, serverTimestamp, query, orderBy, onSnapshot, Timestamp, where } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc, addDoc, serverTimestamp, query, orderBy, onSnapshot, Timestamp, where, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import Papa from 'papaparse';
 
@@ -136,6 +136,20 @@ const UserRegistry = ({ adminEmail }: { adminEmail: string }) => {
       }
    };
 
+   const toggleLeaderboardVisibility = async (uid: string, currentStatus: boolean | undefined) => {
+      try {
+         const newStatus = currentStatus === false ? true : false;
+         await updateDoc(doc(db, 'users', uid), { publicLeaderboard: newStatus });
+         const updatedUsers = users.map(u => u.uid === uid ? { ...u, publicLeaderboard: newStatus } : u);
+         setUsers(updatedUsers);
+         localStorage.setItem('sms_all_users', JSON.stringify(updatedUsers));
+         logAdminAction(adminEmail, newStatus ? 'Shown on Leaderboard' : 'Hidden from Leaderboard', uid);
+      } catch (error) {
+         console.error("Error toggling leaderboard visibility", error);
+         alert("Failed to update user visibility.");
+      }
+   };
+
    const deleteUser = async (uid: string) => {
       if (!window.confirm("Are you sure? This will remove the user and their login access.")) return;
       try {
@@ -209,7 +223,8 @@ const UserRegistry = ({ adminEmail }: { adminEmail: string }) => {
          IsGuest: u.isGuest ? 'Yes' : 'No',
          JoinedAt: new Date(u.joinedAt).toLocaleString(),
          TotalChants: userStats[u.uid] || 0,
-         OnboardedApp: u.onboardedApp ? 'Yes' : 'No'
+         OnboardedApp: u.onboardedApp ? 'Yes' : 'No',
+         PublicLeaderboard: u.publicLeaderboard !== false ? 'Yes' : 'No'
       }));
 
       const csv = Papa.unparse(exportData);
@@ -337,6 +352,13 @@ const UserRegistry = ({ adminEmail }: { adminEmail: string }) => {
                               </td>
                               <td className="p-6 text-right">
                                  <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button
+                                       onClick={() => toggleLeaderboardVisibility(u.uid, u.publicLeaderboard)}
+                                       title={u.publicLeaderboard !== false ? "Hide from Leaderboard" : "Show on Leaderboard"}
+                                       className={`p-2 rounded-lg transition-colors ${u.publicLeaderboard !== false ? 'bg-green-50 text-green-600 hover:bg-green-100' : 'bg-red-50 text-red-600 hover:bg-red-100'}`}
+                                    >
+                                       {u.publicLeaderboard !== false ? <Eye size={16} /> : <EyeOff size={16} />}
+                                    </button>
                                     <button
                                        onClick={() => toggleAdmin(u.uid, u.isAdmin)}
                                        title={u.isAdmin ? "Revoke Admin" : "Make Admin"}
@@ -2537,6 +2559,138 @@ const PushNotificationManager = ({ adminEmail }: { adminEmail: string }) => {
    );
 };
 
+// 20. LEADERBOARD MANAGER
+const LeaderboardManager = ({ adminEmail }: { adminEmail: string }) => {
+   const [rollupStatus, setRollupStatus] = useState<string | null>(null);
+   const [isGenerating, setIsGenerating] = useState(false);
+   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+
+   const loadStatus = async () => {
+      try {
+         const mytDate = new Date(new Date().getTime() + 8 * 60 * 60 * 1000);
+         const todayStr = mytDate.toISOString().split('T')[0];
+         const docRef = doc(db, 'rollups', todayStr);
+         const docSnap = await getDoc(docRef);
+         if (docSnap.exists()) {
+            setRollupStatus('Active');
+            setLastUpdated(docSnap.data().lastUpdated || 'Unknown');
+         } else {
+            setRollupStatus('Missing');
+            setLastUpdated(null);
+         }
+      } catch (e) {
+         console.error(e);
+         setRollupStatus('Error');
+      }
+   };
+
+   useEffect(() => {
+      loadStatus();
+   }, []);
+
+   const generateRollup = async () => {
+      if (!window.confirm("This will aggregate all users and update today's live leaderboard. Continue?")) return;
+      setIsGenerating(true);
+      try {
+         // Query all users
+         const usersRef = collection(db, 'users');
+         const q = query(usersRef, where('publicLeaderboard', '!=', false));
+         const usersSnap = await getDocs(q);
+
+         // Aggregate
+         const centreCounts: Record<string, { count: number; state: string }> = {};
+         const stateCounts: Record<string, number> = {};
+         const members: any[] = [];
+
+         usersSnap.docs.forEach(doc => {
+            const data = doc.data();
+            const total = (data.stats?.gayathri || 0) + (data.stats?.saiGayathri || 0) + (data.stats?.mantras || 0) + ((data.stats?.likitha || 0) * 11);
+
+            if (total > 0) {
+               members.push({
+                  uid: doc.id,
+                  name: data.name || 'Anonymous Devotee',
+                  centre: data.centre || 'Unknown Centre',
+                  state: data.state || 'Unknown State',
+                  count: total,
+                  photoURL: data.photoURL,
+                  gender: data.gender || 'male'
+               });
+
+               const state = data.state || 'Unknown State';
+               stateCounts[state] = (stateCounts[state] || 0) + total;
+
+               const centre = data.centre || 'Unknown Centre';
+               if (!centreCounts[centre]) centreCounts[centre] = { count: 0, state: state };
+               centreCounts[centre].count += total;
+            }
+         });
+
+         members.sort((a, b) => b.count - a.count);
+         const topMembers = members.slice(0, 50);
+
+         // Write to rollups collection
+         const mytDate = new Date(new Date().getTime() + 8 * 60 * 60 * 1000);
+         const todayStr = mytDate.toISOString().split('T')[0];
+
+         await setDoc(doc(db, 'rollups', todayStr), {
+            byCentre: centreCounts,
+            byState: stateCounts,
+            byMember: topMembers,
+            lastUpdated: new Date().toISOString()
+         });
+
+         logAdminAction(adminEmail, 'Generated Leaderboard Rollup', todayStr);
+         await loadStatus();
+         alert("Leaderboard successfully updated!");
+      } catch (e: any) {
+         console.error(e);
+         alert("Aggregation failed: " + e.message);
+      } finally {
+         setIsGenerating(false);
+      }
+   };
+
+   return (
+      <div className="space-y-8 animate-in fade-in">
+         <div className="flex justify-between items-end">
+            <div>
+               <h2 className="text-3xl font-serif font-bold text-navy-900">Leaderboard Control</h2>
+               <p className="text-sm text-navy-400">Manage daily aggregations for the public timeline.</p>
+            </div>
+         </div>
+
+         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <Card className="p-8">
+               <h3 className="text-lg font-bold text-navy-900 mb-6 flex items-center gap-2">
+                  <Database size={20} className="text-gold-500" /> Today's Rollup Status
+               </h3>
+
+               <div className="flex items-center gap-4 mb-6">
+                  <div className={`p-4 rounded-xl ${rollupStatus === 'Active' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                     {rollupStatus === 'Active' ? <CheckCircle2 size={32} /> : <XCircle size={32} />}
+                  </div>
+                  <div>
+                     <p className="font-bold text-navy-900 text-lg">{rollupStatus || 'Checking...'}</p>
+                     {lastUpdated && <p className="text-xs text-navy-400">Last updated: {new Date(lastUpdated).toLocaleTimeString()}</p>}
+                  </div>
+               </div>
+
+               <button
+                  onClick={generateRollup}
+                  disabled={isGenerating}
+                  className="w-full py-4 bg-navy-900 text-white rounded-xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 hover:bg-gold-500 transition-colors disabled:opacity-50"
+               >
+                  {isGenerating ? <RefreshCw className="animate-spin" size={16} /> : <PlayCircle size={16} />}
+                  {isGenerating ? 'Aggregating...' : 'Force Generate Now'}
+               </button>
+               <p className="text-[10px] text-navy-400 mt-4 text-center">Run this to immediately push live stats to the homepage leaderboard.</p>
+            </Card>
+         </div>
+      </div>
+   );
+};
+
 // --- MAIN PAGE ---
 
 const AdminPage: React.FC<{ user: UserProfile | null }> = ({ user }) => {
@@ -2633,6 +2787,7 @@ const AdminPage: React.FC<{ user: UserProfile | null }> = ({ user }) => {
                <AdminNavItem active={activeModule === 'bookclub_analytics'} onClick={() => setActiveModule('bookclub_analytics')} icon={<Trophy size={20} />} label="Book Club Analytics" />
                <div className="my-4 border-t border-navy-50"></div>
                <h4 className="text-[9px] font-black uppercase text-navy-200 tracking-[0.3em] px-6 mb-4">System</h4>
+               <AdminNavItem active={activeModule === 'leaderboard'} onClick={() => setActiveModule('leaderboard')} icon={<Target size={20} />} label="Leaderboard Control" />
                <AdminNavItem active={activeModule === 'page_content'} onClick={() => setActiveModule('page_content')} icon={<Type size={20} />} label="Page Text" />
                <AdminNavItem active={activeModule === 'branding'} onClick={() => setActiveModule('branding')} icon={<Layout size={20} />} label="Brand Identity" />
             </aside>
@@ -2650,6 +2805,7 @@ const AdminPage: React.FC<{ user: UserProfile | null }> = ({ user }) => {
                {activeModule === 'articles' && <ArticleManager adminEmail={user?.email || 'admin'} user={user} />}
                {activeModule === 'article_comments' && <ArticleCommentModeration adminEmail={user?.email || 'admin'} />}
                {activeModule === 'sadhana' && <SadhanaAnalytics />}
+               {activeModule === 'leaderboard' && <LeaderboardManager adminEmail={user?.email || 'admin'} />}
             </main>
          </div>
       </div>

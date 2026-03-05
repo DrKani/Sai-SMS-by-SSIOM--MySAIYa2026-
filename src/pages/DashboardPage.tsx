@@ -8,7 +8,7 @@ import { UserBriefcaseItem, UserProfile } from '../types';
 import { ToastContainer, useToast } from '../components/Toast';
 import confetti from 'canvas-confetti';
 import Skeleton from '../components/Skeleton';
-import { doc, onSnapshot, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, onSnapshot, collection, query, where, getDocs, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { subscribeToNationalStats, NationalStats } from '../lib/nationalStats';
 
@@ -38,6 +38,9 @@ const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { toasts, showToast, closeToast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
+
+  // Leaderboard Rank State
+  const [userRank, setUserRank] = useState<{ rank: number | null, score: number, totalRanked: number, loaded: boolean }>({ rank: null, score: 0, totalRanked: 0, loaded: false });
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -119,6 +122,39 @@ const DashboardPage: React.FC = () => {
       unsubNational();
     };
   }, [location.state]);
+
+  // Fetch National Rank
+  useEffect(() => {
+    const fetchRank = async () => {
+      try {
+        const mytDate = new Date(new Date().getTime() + 8 * 60 * 60 * 1000);
+        const todayStr = mytDate.toISOString().split('T')[0];
+        const docRef = doc(db, 'rollups', todayStr);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists() && user?.uid) {
+          const data = docSnap.data();
+          const members = data.byMember || [];
+          const idx = members.findIndex((m: any) => m.uid === user.uid);
+          setUserRank({
+            rank: idx >= 0 ? idx + 1 : null,
+            score: idx >= 0 ? members[idx].count : 0,
+            totalRanked: members.length,
+            loaded: true
+          });
+        } else {
+          setUserRank(prev => ({ ...prev, loaded: true }));
+        }
+      } catch (err) {
+        console.error("Error fetching rank:", err);
+        setUserRank(prev => ({ ...prev, loaded: true }));
+      }
+    };
+
+    if (user && !user.isGuest) {
+      fetchRank();
+    }
+  }, [user?.uid]);
 
   // Fetch Timeframe Stats Whenever Timeframe changes
   useEffect(() => {
@@ -372,6 +408,45 @@ const DashboardPage: React.FC = () => {
 
         {/* Sidebar: Badges & Summary */}
         <div className="space-y-8">
+
+          {/* National Standing Rank Card */}
+          {!user?.isGuest && userRank.loaded && (
+            <div className="bg-gold-gradient p-[1px] rounded-bento shadow-xl hover:-translate-y-1 transition-transform group">
+              <div className="bg-navy-900 rounded-[calc(24px-1px)] p-8 text-white text-center relative overflow-hidden">
+                <div className="absolute -top-10 -right-10 opacity-5 group-hover:scale-110 transition-transform duration-700">
+                  <Trophy size={150} />
+                </div>
+                <div className="relative z-10">
+                  <Trophy size={40} className="text-gold-500 mx-auto mb-4 drop-shadow-lg" />
+                  <h3 className="text-lg font-serif font-bold mb-2">National Standing</h3>
+
+                  {userRank.rank ? (
+                    <div className="mb-6">
+                      <div className="flex items-end justify-center gap-1 mb-1">
+                        <span className="text-xl font-bold text-gold-500 pb-1">#</span>
+                        <span className="text-5xl font-black text-gold-500 leading-none">{userRank.rank}</span>
+                      </div>
+                      <p className="text-[9px] text-navy-300 font-bold uppercase tracking-widest">
+                        Out of {userRank.totalRanked} Devotees
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="mb-6 py-2">
+                      <p className="text-xl font-black text-white/80 mb-1">Unranked</p>
+                      <p className="text-[9px] text-navy-400 font-bold uppercase tracking-widest leading-relaxed">
+                        Top 50 Rank Required<br />Begin your Sadhana
+                      </p>
+                    </div>
+                  )}
+
+                  <Link to="/?tab=devotees" className="inline-block w-full py-3 bg-white/10 hover:bg-white/20 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors border border-white/5 shadow-inner">
+                    View Leaderboard
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div id="tutorial-dashboard" className="bg-navy-900 p-10 rounded-bento text-white shadow-2xl relative overflow-hidden">
             <div className="absolute top-0 right-0 p-10 opacity-10"><Activity size={120} /></div>
             <h3 className="text-xl font-bold mb-6 text-gold-500">Sacred Summary {timeframe !== 'all-time' ? `(${timeframe})` : ''}</h3>
