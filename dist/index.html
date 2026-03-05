@@ -6,6 +6,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sai SMS by SSIOM (v2)</title>
 
+  <!-- Early connection hints — shave 100-200ms per external resource -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="dns-prefetch" href="https://cdn.tailwindcss.com" />
+  <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com" />
+
   <!-- SEO Meta Tags -->
   <meta name="description"
     content="Sai SMS by SSIOM - A digital spiritual hub for SSIOM Malaysia members. Track your sadhana, join the National Book Club, and explore spiritual growth tools.">
@@ -38,10 +44,18 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Poppins:wght@300;400;500;600;700&family=Open+Sans:wght@400;600&display=swap"
     rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <!-- Font Awesome — loaded async (not needed for initial render) -->
+  <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'" />
+  <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"></noscript>
+
+  <!-- pdf.js — deferred (only needed when user opens a PDF) -->
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script>
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    document.addEventListener('DOMContentLoaded', function() {
+      if (typeof pdfjsLib !== 'undefined') {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      }
+    });
 
     tailwind.config = {
       theme: {
@@ -219,7 +233,9 @@
   <!-- Note: importmap removed. All dependencies are bundled by Vite. -->
   <link rel="stylesheet" href="/index.css">
   <meta name="version" content="2.0.0" />
-  <script type="module" crossorigin src="/assets/index-DsnyZBZV.js"></script>
+  <script type="module" crossorigin src="/assets/index-DddQuAFZ.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/vendor-react-CSVro9Lz.js">
+  <link rel="modulepreload" crossorigin href="/assets/vendor-firebase-BAML438-.js">
 </head>
 
 <body>
