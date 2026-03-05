@@ -7,9 +7,9 @@ import TutorialOverlay, { TutorialStep } from './components/TutorialOverlay';
 import {
   Menu, X, Bell, LogOut, ChevronRight, Search,
   MapPin, ShieldCheck, UserCircle,
-  Home, ArrowUp, Phone, LogIn,
+  Home, Activity, Phone, LogIn,
   Megaphone, Calendar, Sparkles, CheckCheck,
-  Library, Gamepad2, Heart, MessageSquare, Activity, Loader2, Trophy,
+  Library, Gamepad2, Heart, MessageSquare, Loader2, Trophy,
   ExternalLink,
   MessageCircle,
   Globe,
@@ -24,7 +24,8 @@ import {
   Youtube,
   Instagram,
   Facebook,
-  Music
+  Music,
+  BookOpen
 } from 'lucide-react';
 
 import { UserProfile, Announcement, BrandingConfig, SiteContent, AppNotification } from './types';
@@ -363,6 +364,14 @@ const Layout: React.FC = () => {
 
   return (
     <div className="flex flex-col min-h-screen">
+      <svg width="0" height="0" className="absolute pointer-events-none">
+        <defs>
+          <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop stopColor="#D2AC47" offset="0%" />
+            <stop stopColor="#F7EF8A" offset="100%" />
+          </linearGradient>
+        </defs>
+      </svg>
       <NavigationListener onNavigate={() => { setSearchQuery(""); setIsSearchOpen(false); setIsMenuOpen(false); }} />
       <OfflineBanner />
       <CookieConsent />
@@ -391,8 +400,13 @@ const Layout: React.FC = () => {
             <NotificationBell unreadCount={unreadCount} onClick={() => setIsNotifOpen(true)} />
             {isAdmin && <Link to="/admin" className="btn-admin hidden lg:flex items-center gap-2"><ShieldCheck size={14} /> Admin</Link>}
             <ProfileDropdown user={user} isAdmin={isAdmin} onLogout={() => setShowLogoutConfirm(true)} />
-            <button onClick={() => setIsMenuOpen(true)} className="hamburger-btn p-2 min-h-[44px] min-w-[44px] text-navy-900 hover:text-purple-600 transition-colors flex items-center justify-center rounded-xl hover:bg-navy-50">
-              <Menu size={28} /><span className="sr-only">Menu</span>
+            <button
+              onClick={() => setIsMenuOpen(true)}
+              title="Menu"
+              className={`hamburger-btn group p-2 min-h-[44px] min-w-[44px] text-white transition-colors flex items-center justify-center rounded-xl hover:bg-white/5 ${isMenuOpen ? 'open' : ''}`}
+            >
+              <Menu size={28} className="group-hover:[stroke:url(#goldGradient)] group-[.open]:[stroke:url(#goldGradient)] transition-all duration-300" />
+              <span className="sr-only">Menu</span>
             </button>
           </div>
         </div>
@@ -444,46 +458,80 @@ const Layout: React.FC = () => {
 
       <Footer user={user} branding={branding} siteContent={siteContent} />
 
-      {isMenuOpen && (
-        <div className="fixed inset-0 z-[100] flex justify-end">
-          <div className="mobile-nav-overlay absolute inset-0 bg-navy-900/60 backdrop-blur-sm" onClick={() => setIsMenuOpen(false)}></div>
-          <div className="mobile-nav-drawer relative w-80 h-full bg-white shadow-2xl p-8 flex flex-col overflow-y-auto animate-in slide-in-from-right duration-300">
-            <button onClick={() => setIsMenuOpen(false)} className="absolute top-6 right-6 p-2 min-h-[44px] min-w-[44px] text-navy-200 hover:text-navy-900 hover:bg-neutral-100 rounded-full transition-all flex items-center justify-center"><X size={32} /></button>
-            <div className="mt-16 space-y-12 flex-grow">
-              {user?.isGuest && (
-                <div className="px-4 py-3 bg-neutral-100 rounded-2xl flex items-center gap-3 border-2 border-neutral-200">
-                  <UserCircle size={20} className="text-navy-400" />
-                  <div><p className="text-xs font-bold text-navy-900">Browsing as Guest</p><p className="text-[10px] text-navy-500"><Link to="/signup" className="text-gold-600 font-bold hover:underline" onClick={() => setIsMenuOpen(false)}>Sign up</Link> to access all</p></div>
+      <div className={`fixed inset-0 z-[100] flex justify-end transition-all ${isMenuOpen ? 'visible pointer-events-auto' : 'invisible pointer-events-none'}`}>
+        <div
+          className={`mobile-nav-overlay absolute inset-0 bg-navy-900/60 backdrop-blur-sm ${isMenuOpen ? 'open' : ''}`}
+          onClick={() => setIsMenuOpen(false)}
+        ></div>
+        <div className={`mobile-nav-drawer relative w-80 h-full bg-white shadow-2xl p-8 flex flex-col overflow-y-auto animate-in slide-in-from-right duration-300 ${isMenuOpen ? 'open' : ''}`}>
+          <button onClick={() => setIsMenuOpen(false)} className="absolute top-6 right-6 p-2 min-h-[44px] min-w-[44px] text-navy-200 hover:text-navy-900 hover:bg-neutral-100 rounded-full transition-all flex items-center justify-center"><X size={32} /></button>
+          <div className="mt-16 space-y-8 flex-grow">
+            {user && !user.isGuest ? (
+              <div className="flex items-center gap-4 px-2">
+                <Link to="/dashboard" onClick={() => setIsMenuOpen(false)} className="shrink-0 flex-shrink-0">
+                  <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-gold-500 p-0.5 bg-white">
+                    <img src={user.photoURL || APP_CONFIG.AVATAR_MALE} alt={user.name} className="w-full h-full object-cover rounded-full" />
+                  </div>
+                </Link>
+                <div className="flex flex-col justify-center h-14">
+                  <Link to="/profile" onClick={() => setIsMenuOpen(false)} className="text-sm font-bold text-navy-900 leading-tight hover:text-gold-600 transition-colors line-clamp-1">
+                    Bro/Sis {user.name}
+                  </Link>
+                  {user.centre && (
+                    <span className="text-[10px] italic text-navy-500 leading-tight line-clamp-2 mt-0.5">
+                      {user.centre}
+                    </span>
+                  )}
                 </div>
-              )}
-              <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-navy-300 mb-6 px-4">Navigation</h3>
+              </div>
+            ) : (
+              <div className="px-4 py-3 bg-neutral-100 rounded-2xl flex items-center gap-3 border-2 border-neutral-200">
+                <UserCircle size={20} className="text-navy-400" />
+                <div><p className="text-xs font-bold text-navy-900">Browsing as Guest</p><p className="text-[10px] text-navy-500"><Link to="/signup" className="text-gold-600 font-bold hover:underline" onClick={() => setIsMenuOpen(false)}>Sign up</Link> to access all</p></div>
+              </div>
+            )}
+
+            <div>
+              <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-navy-300 mb-4 px-4">Navigation</h3>
               <nav className="space-y-1">
-                <MenuLink to="/" label="Home" icon={<Home size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/'} />
-                <MenuLink to="/calendar" label="National Calendar" icon={<Calendar size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/calendar'} />
-                <MenuLink to="/events" label="National Events" icon={<Sparkles size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname.startsWith('/events')} />
-                <MenuLink to="/contact" label="Contact Us" icon={<Phone size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/contact'} />
+                <MenuLink to="/" label="Sai SMS Home" icon={<Home size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/'} />
 
                 {user ? (
                   <>
-                    <MenuLink to="/dashboard" label="My Dashboard" icon={<Activity size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/dashboard'} />
-                    <MenuLink to="/namasmarana" label="Mantra Tracking" icon={<Mic size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/namasmarana'} />
-                    <MenuLink to="/leaderboard" label="Leaderboard" icon={<Trophy size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/leaderboard'} />
-                    <MenuLink to="/book-club" label="Sai Lit Club" icon={<Library size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname.startsWith('/book-club')} />
-                    <MenuLink to="/games" label="Play it" icon={<Gamepad2 size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/games'} />
-                    <MenuLink to="/journal" label="Reflections" icon={<ScrollText size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/journal'} />
-                    <MenuLink to="/articles" label="Articles" icon={<PenTool size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname.startsWith('/articles')} />
-                    <MenuLink to="/profile" label="Profile" icon={<UserCircle size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/profile'} />
+                    <MenuLink to="/dashboard" label="My Sai SMS Dashboard" icon={<UserCircle size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/dashboard'} />
+                    <MenuLink to="/journal" label="My Reflections" icon={<PenTool size={16} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/journal'} isChild />
+                    <MenuLink to="/dashboard" label="My Briefcase" icon={<BookOpen size={16} />} onClick={() => setIsMenuOpen(false)} isChild />
+                    <MenuLink to="/profile" label="My Profile" icon={<UserCircle size={16} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/profile'} isChild />
+                    <MenuLink to="/leaderboard" label="Sai SMS Leaderboard" icon={<Trophy size={16} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/leaderboard'} isChild />
+
+                    <MenuLink to="/namasmarana" label="Sai SMS Mantra Count" icon={<Mic size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/namasmarana' && !location.hash.includes('likitha')} />
+                    <MenuLink to="/namasmarana#likitha" label="Sai SMS Likitha Japa" icon={<PenTool size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/namasmarana' && location.hash.includes('likitha')} />
+                    <MenuLink to="/book-club" label="Sai SMS Book Club" icon={<Library size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname.startsWith('/book-club')} />
+                    <MenuLink to="/games" label="Sai SMS Play it" icon={<Gamepad2 size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/games'} />
+                    <MenuLink to="/calendar" label="Sai SMS Calendar" icon={<Calendar size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/calendar'} />
+                    <MenuLink to="/articles" label="Sai SMS Blog" icon={<ScrollText size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname.startsWith('/articles')} />
                   </>
                 ) : (
                   <>
-                    <MenuLink to="/signin" label="Sign In" icon={<LogIn size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/signin'} />
-                    <MenuLink to="/signup" label="Sign Up" icon={<UserPlus size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/signup'} />
-                    <MenuLink to="/namasmarana" label="Mantra Tracking" icon={<Mic size={18} />} onClick={() => setIsMenuOpen(false)} isProtected isLocked />
-                    <MenuLink to="/book-club" label="Sai Lit Club" icon={<Library size={18} />} onClick={() => setIsMenuOpen(false)} isProtected isLocked />
-                    <MenuLink to="/articles" label="Articles" icon={<PenTool size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname.startsWith('/articles')} />
+                    <MenuLink to="/namasmarana" label="Sai SMS Mantra Count" icon={<Mic size={18} />} onClick={() => setIsMenuOpen(false)} isProtected isLocked />
+                    <MenuLink to="/namasmarana#likitha" label="Sai SMS Likitha Japa" icon={<PenTool size={18} />} onClick={() => setIsMenuOpen(false)} isProtected isLocked />
+                    <MenuLink to="/book-club" label="Sai SMS Book Club" icon={<Library size={18} />} onClick={() => setIsMenuOpen(false)} isProtected isLocked />
+                    <MenuLink to="/games" label="Sai SMS Play it" icon={<Gamepad2 size={18} />} onClick={() => setIsMenuOpen(false)} isProtected isLocked />
+                    <MenuLink to="/calendar" label="Sai SMS Calendar" icon={<Calendar size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/calendar'} />
+                    <MenuLink to="/articles" label="Sai SMS Blog" icon={<ScrollText size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname.startsWith('/articles')} />
+
+                    <div className="pt-4 mt-4 border-t border-navy-50">
+                      <MenuLink to="/signin" label="Sign In" icon={<LogIn size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/signin'} />
+                      <MenuLink to="/signup" label="Sign Up" icon={<UserPlus size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/signup'} />
+                    </div>
                   </>
                 )}
-                {isAdmin && <MenuLink to="/admin" label="Admin Hub" icon={<Shield size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/admin'} />}
+                {isAdmin && <MenuLink to="/admin" label="Sai SMS Admin Hub" icon={<Shield size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/admin'} />}
+
+                <div className="pt-2">
+                  <MenuLink to="/about" label="About us" icon={<Info size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/about'} />
+                  <MenuLink to="/contact" label="Contact Sai SMS by SSIOM" icon={<Mail size={16} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/contact'} isChild />
+                </div>
               </nav>
             </div>
             {user && (
@@ -495,7 +543,7 @@ const Layout: React.FC = () => {
             )}
           </div>
         </div>
-      )}
+      </div>
 
       {showLogoutConfirm && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">

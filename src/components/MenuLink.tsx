@@ -10,33 +10,34 @@ interface MenuLinkProps {
     isProtected?: boolean;
     isLocked?: boolean;
     isActive?: boolean;
+    isChild?: boolean;
 }
 
-const MenuLink: React.FC<MenuLinkProps> = ({ to, label, icon, onClick, isProtected = false, isLocked = false, isActive = false }) => (
+const MenuLink: React.FC<MenuLinkProps> = ({ to, label, icon, onClick, isProtected = false, isLocked = false, isActive = false, isChild = false }) => (
     <li>
         <Link
             to={to}
             onClick={onClick}
-            className={`flex items-center justify-between py-3.5 px-4 rounded-2xl group transition-all ${isActive
-                    ? 'bg-gold-50 border-2 border-gold-500'
-                    : 'hover:bg-neutral-50 border-2 border-transparent'
+            className={`flex items-center justify-between py-3 px-4 rounded-2xl group transition-all ${isChild ? 'ml-6 py-2.5 mt-1' : 'mt-1.5'} ${isActive
+                ? 'bg-gold-50 border-2 border-gold-500'
+                : 'hover:bg-neutral-50 border-2 border-transparent'
                 }`}
         >
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
                 {icon && (
                     <span
                         className={`transition-colors ${isActive
-                                ? 'text-gold-600'
-                                : 'text-navy-300 group-hover:text-gold-600'
+                            ? 'text-gold-600'
+                            : 'text-navy-300 group-hover:text-gold-600'
                             }`}
                     >
                         {icon}
                     </span>
                 )}
                 <span
-                    className={`text-xs font-black uppercase tracking-widest transition-colors ${isActive
-                            ? 'text-gold-700'
-                            : 'text-navy-900 group-hover:text-gold-600'
+                    className={`${isChild ? 'text-[11px]' : 'text-xs'} font-black uppercase tracking-widest transition-colors ${isActive
+                        ? 'text-gold-700'
+                        : 'text-navy-900 group-hover:text-gold-600'
                         }`}
                 >
                     {label}
@@ -48,8 +49,8 @@ const MenuLink: React.FC<MenuLinkProps> = ({ to, label, icon, onClick, isProtect
             <ChevronRight
                 size={14}
                 className={`transition-all ${isActive
-                        ? 'opacity-100 text-gold-600'
-                        : 'opacity-0 group-hover:opacity-100 text-gold-500'
+                    ? 'opacity-100 text-gold-600'
+                    : 'opacity-0 group-hover:opacity-100 text-gold-500'
                     }`}
             />
         </Link>
