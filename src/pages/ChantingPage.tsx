@@ -61,7 +61,7 @@ const ChantingPage: React.FC = () => {
     // 1. Update National Stats in Firestore
     try {
       const realChantCount = type === 'likitha' ? (value * 11) : value;
-      await recordSadhanaOffering(user.uid, user.state || 'Other', realChantCount);
+      await recordSadhanaOffering(user.uid, user.state || 'Other', realChantCount, type);
     } catch (e) {
       console.warn("National stats sync failed:", e);
     }
