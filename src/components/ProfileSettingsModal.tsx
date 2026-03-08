@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { X, UserCircle, Loader2, Save, MapPin, Phone, Mail, Link as LinkIcon, Award, User, Home, Building, CheckCircle2, Shield } from 'lucide-react';
+import { X, UserCircle, Loader2, Save, MapPin, Phone, Mail, Link as LinkIcon, Award, User, Home, Building, CheckCircle2, Shield, Camera, Image as ImageIcon } from 'lucide-react';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { updateProfile } from 'firebase/auth';
-import { db, auth } from '../lib/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, auth, storage } from '../lib/firebase';
 import { UserProfile } from '../types';
 import SaiAvatar from './SaiAvatar';
 
@@ -32,6 +33,8 @@ const FEMALE_AVATARS = [
 ];
 
 const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({ isOpen, onClose, user, onSave }) => {
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState<Partial<UserProfile>>({
     name: user.name || '',
     photoURL: user.photoURL || '',
@@ -82,6 +85,30 @@ const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({ isOpen, onC
       });
     }
   }, [isOpen, user]);
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !auth.currentUser) return;
+
+    // Check size < 1MB
+    if (file.size > 1024 * 1024) {
+      alert("Photo too large! Please use a file smaller than 1MB.");
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const storageRef = ref(storage, `profiles/${auth.currentUser.uid}_${Date.now()}`);
+      const snapshot = await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(snapshot.ref);
+      setFormData(prev => ({ ...prev, photoURL: url }));
+    } catch (error: any) {
+      console.error("Photo upload error", error);
+      alert("Failed to upload photo: " + error.message);
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -204,17 +231,30 @@ const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({ isOpen, onC
                     <button type="button" onClick={() => setFormData({ ...formData, gender: 'male', photoURL: '' })} className={`flex-1 py-3 rounded-xl border-2 transition-all font-bold text-sm ${formData.gender === 'male' ? 'border-gold-500 bg-gold-50 text-gold-700' : 'border-navy-50 bg-neutral-50 text-navy-500'}`}>Brother</button>
                     <button type="button" onClick={() => setFormData({ ...formData, gender: 'female', photoURL: '' })} className={`flex-1 py-3 rounded-xl border-2 transition-all font-bold text-sm ${formData.gender === 'female' ? 'border-gold-500 bg-gold-50 text-gold-700' : 'border-navy-50 bg-neutral-50 text-navy-500'}`}>Sister</button>
                   </div>
-                  <div className="grid grid-cols-4 gap-3 bg-neutral-50 p-4 rounded-xl border border-navy-50">
-                    {auth.currentUser?.photoURL && (
-                      <button type="button" onClick={() => setFormData({ ...formData, photoURL: auth.currentUser?.photoURL || '' })} className={`relative group transition-all duration-300 rounded-full aspect-square ${formData.photoURL === auth.currentUser.photoURL ? 'ring-4 ring-gold-500 scale-105' : 'opacity-70 hover:opacity-100 hover:scale-105 border border-navy-100'}`} title="Google Profile Picture">
-                        <img src={auth.currentUser.photoURL} alt="Google" className="w-full h-full rounded-full object-cover" />
-                      </button>
-                    )}
-                    {(formData.gender === 'male' ? MALE_AVATARS : FEMALE_AVATARS).map((url, idx) => (
-                      <button key={idx} type="button" onClick={() => setFormData({ ...formData, photoURL: url })} className={`relative group transition-all duration-300 rounded-full aspect-square ${formData.photoURL === url ? 'ring-4 ring-gold-500 scale-105' : 'opacity-70 hover:opacity-100 hover:scale-105 border border-navy-100'}`}>
-                        <img src={url} alt={`Avatar ${idx}`} className="w-full h-full rounded-full object-cover" />
-                      </button>
-                    ))}
+                  <div className="flex flex-col gap-3 p-4 bg-neutral-50 rounded-xl border border-navy-50">
+                    <input type="file" ref={fileInputRef} onChange={handlePhotoUpload} accept="image/*" className="hidden" />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploading}
+                      className="w-full py-4 border-2 border-dashed border-navy-100 rounded-xl flex flex-col items-center justify-center gap-2 text-navy-400 hover:border-gold-500 hover:text-gold-600 transition-all hover:bg-gold-50/30 disabled:opacity-50"
+                    >
+                      {uploading ? <Loader2 size={24} className="animate-spin" /> : <Camera size={24} />}
+                      <span className="text-[10px] font-black uppercase tracking-widest">{uploading ? 'Uploading...' : 'Upload Custom Photo'}</span>
+                    </button>
+
+                    <div className="grid grid-cols-4 gap-3">
+                      {auth.currentUser?.photoURL && !auth.currentUser.photoURL.includes('avatars/') && (
+                        <button type="button" onClick={() => setFormData({ ...formData, photoURL: auth.currentUser?.photoURL || '' })} className={`relative group transition-all duration-300 rounded-full aspect-square ${formData.photoURL === auth.currentUser.photoURL ? 'ring-4 ring-gold-500 scale-105' : 'opacity-70 hover:opacity-100 hover:scale-105 border border-navy-100'}`} title="Google Profile Picture">
+                          <img src={auth.currentUser.photoURL} alt="Google" className="w-full h-full rounded-full object-cover" />
+                        </button>
+                      )}
+                      {(formData.gender === 'male' ? MALE_AVATARS : FEMALE_AVATARS).map((url, idx) => (
+                        <button key={idx} type="button" onClick={() => setFormData({ ...formData, photoURL: url })} className={`relative group transition-all duration-300 rounded-full aspect-square ${formData.photoURL === url ? 'ring-4 ring-gold-500 scale-105' : 'opacity-70 hover:opacity-100 hover:scale-105 border border-navy-100'}`}>
+                          <img src={url} alt={`Avatar ${idx}`} className="w-full h-full rounded-full object-cover" />
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </section>

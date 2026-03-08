@@ -56,7 +56,7 @@ const MultiFunctionFAB: React.FC<MultiFunctionFABProps> = ({ showScrollTop, onSc
                 <div className="relative group">
                     <button
                         onClick={onScrollTop}
-                        className="w-14 h-14 bg-white border-2 border-gold-500 rounded-full shadow-xl flex items-center justify-center text-navy-900 hover:scale-110 active:scale-95 transition-all"
+                        className="fab fab-home w-14 h-14 bg-white border-2 border-gold-500 rounded-full shadow-xl flex items-center justify-center text-navy-900 hover:scale-110 active:scale-95 transition-all"
                     >
                         <ArrowUp size={24} strokeWidth={2.5} />
                     </button>
@@ -93,7 +93,7 @@ const MultiFunctionFAB: React.FC<MultiFunctionFABProps> = ({ showScrollTop, onSc
             <div className="relative group">
                 <button
                     onClick={() => setIsExpanded(!isExpanded)}
-                    className={`w-16 h-16 bg-gold-gradient rounded-full shadow-2xl flex items-center justify-center text-navy-900 border border-white/30 hover:scale-110 active:scale-95 transition-all ${isExpanded ? 'rotate-45' : ''
+                    className={`fab fab-add w-16 h-16 bg-gold-gradient rounded-full shadow-2xl flex items-center justify-center text-navy-900 border border-white/30 hover:scale-110 active:scale-95 transition-all ${isExpanded ? 'rotate-45' : ''
                         }`}
                     aria-label={isExpanded ? 'Close quick actions' : 'Open quick actions'}
                 >

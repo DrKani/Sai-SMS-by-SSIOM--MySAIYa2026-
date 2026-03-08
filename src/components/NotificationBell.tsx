@@ -11,7 +11,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ unreadCount, onClic
     return (
         <button
             onClick={onClick}
-            className="relative p-2 text-navy-900 hover:text-purple-600 transition-colors group"
+            className="notification-bell relative p-2 text-navy-900 hover:text-purple-600 transition-colors group"
             aria-label={`Notifications ${unreadCount > 0 ? `(${unreadCount} unread)` : ''}`}
         >
             <Bell size={24} className="transition-transform group-hover:scale-110" />

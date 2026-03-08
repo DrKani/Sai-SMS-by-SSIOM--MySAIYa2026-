@@ -2,13 +2,24 @@ import React, { useState, useEffect } from 'react';
 import { Bell, Calendar, Tag, ChevronRight, Share2, Info } from 'lucide-react';
 import { Announcement } from '../types';
 
+import { collection, getDocs, orderBy, query } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+
 const AnnouncementsPage: React.FC = () => {
   const [anns, setAnns] = useState<Announcement[]>([]);
   const [filter, setFilter] = useState<'All' | 'Event' | 'News' | 'Spiritual'>('All');
 
   useEffect(() => {
-    const stored = JSON.parse(localStorage.getItem('sms_announcements') || '[]');
-    setAnns(stored);
+    const fetchAnns = async () => {
+      try {
+        const snap = await getDocs(query(collection(db, 'announcements'), orderBy('timestamp', 'desc')));
+        const ans = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Announcement));
+        setAnns(ans);
+      } catch (e) {
+        console.error("Failed to fetch announcements:", e);
+      }
+    };
+    fetchAnns();
   }, []);
 
   const filteredAnn = filter === 'All'
@@ -46,7 +57,7 @@ const AnnouncementsPage: React.FC = () => {
             <div className="p-8">
               <div className="flex items-center gap-3 mb-4">
                 <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${ann.category === 'Event' ? 'bg-magenta-100 text-magenta-600' :
-                    ann.category === 'News' ? 'bg-teal-100 text-teal-600' : 'bg-purple-100 text-purple-600'
+                  ann.category === 'News' ? 'bg-teal-100 text-teal-600' : 'bg-purple-100 text-purple-600'
                   }`}>
                   {ann.category}
                 </span>

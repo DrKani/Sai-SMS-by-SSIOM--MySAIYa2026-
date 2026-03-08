@@ -4,7 +4,7 @@ import { Minus, Plus, Send, CheckCircle2, Sparkles, Lock, Check, UserPlus, X, Al
 import { DEFAULT_SITE_CONTENT } from '../constants';
 import { SiteContent } from '../types';
 import { db } from '../lib/firebase';
-import { doc, getDoc, setDoc, increment as firebaseIncrement } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, increment as firebaseIncrement, query, where, getDocs, limit } from 'firebase/firestore';
 import { recordSadhanaOffering } from '../lib/nationalStats';
 
 const AvatarOption = ({ gender, selected, onClick }: { gender: 'male' | 'female', selected: boolean, onClick: () => void }) => (
@@ -34,7 +34,7 @@ const ChantingPage: React.FC = () => {
   const [siteContent, setSiteContent] = useState<SiteContent>(DEFAULT_SITE_CONTENT);
 
   // Likitha Japam State
-  const [japamLines, setJapamLines] = useState<string[]>(Array(11).fill(''));
+  const [likithaText, setLikithaText] = useState('');
   const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   const [showSuccess, setShowSuccess] = useState(false);
@@ -54,8 +54,28 @@ const ChantingPage: React.FC = () => {
   const updateStats = async (type: 'gayathri' | 'saiGayathri' | 'likitha', value: number) => {
     if (!user || user.isGuest) return;
 
+    const realChantCount = type === 'likitha' ? (value * 11) : value;
+
     if (!navigator.onLine) {
-      throw new Error("NETWORK_OFFLINE");
+      const { saveOfflineSubmission } = await import('../lib/offlineQueue');
+      await saveOfflineSubmission({
+        userId: user.uid,
+        state: user.state || 'Other',
+        type,
+        value,
+        realChantCount
+      });
+
+      // Update Personal Stats in LocalStorage
+      const userStatsKey = `sms_stats_${user.uid}`;
+      const userStats = JSON.parse(localStorage.getItem(userStatsKey) || '{"gayathri":0, "saiGayathri":0, "likitha":0}');
+      userStats[type] += value;
+      localStorage.setItem(userStatsKey, JSON.stringify(userStats));
+      window.dispatchEvent(new Event('storage'));
+
+      // Notify the Offline Indicator UI
+      window.dispatchEvent(new Event('offline_submission_added'));
+      return;
     }
 
     // 1. Update National Stats in Firestore
@@ -72,13 +92,79 @@ const ChantingPage: React.FC = () => {
     userStats[type] += value;
     localStorage.setItem(userStatsKey, JSON.stringify(userStats));
 
-    // 3. Sync to Personal Firestore Doc
+    // 3. Sync to Personal Firestore Doc & Record for Badge/Leaderboard
     try {
       const userRef = doc(db, 'users', user.uid);
+      // Streak Logic
+      const now = new Date();
+      // Ensure we use local dates for accuracy (e.g. Asia/Kuala_Lumpur if that's the timezone, but here we just safely strip time)
+      const todayStr = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+      const lastActivityStr = user.lastActivity
+        ? new Date(new Date(user.lastActivity).getTime() - (new Date(user.lastActivity).getTimezoneOffset() * 60000)).toISOString().split('T')[0]
+        : '';
+
+      let streakUpdate = {};
+      if (lastActivityStr !== todayStr) {
+        if (lastActivityStr) {
+          const todayDate = new Date(todayStr);
+          const lastDate = new Date(lastActivityStr);
+          const diffDays = Math.round((todayDate.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
+
+          if (diffDays === 1) {
+            streakUpdate = { streak: (user.streak || 0) + 1 };
+          } else if (diffDays > 1) {
+            streakUpdate = { streak: 1 };
+          }
+        } else {
+          // First time
+          streakUpdate = { streak: 1 };
+        }
+      }
+
+      // Check for milestone badges
+      const currentStreak = (streakUpdate as any).streak || user.streak || 0;
+      const badges = JSON.parse(localStorage.getItem('sms_badges') || '[]');
+      const badgeThresholds = [
+        { days: 3, id: 'streak_3', title: '3-Day Streak', icon: '🔥', earnedAt: now.toISOString() },
+        { days: 7, id: 'streak_7', title: '7-Day Streak', icon: '🌟', earnedAt: now.toISOString() },
+        { days: 21, id: 'streak_21', title: '21-Day Habit', icon: '🏆', earnedAt: now.toISOString() },
+        { days: 30, id: 'streak_30', title: '30-Day Devotee', icon: '👑', earnedAt: now.toISOString() }
+      ];
+
+      let newBadgeWon = false;
+      badgeThresholds.forEach(b => {
+        if (currentStreak >= b.days && !badges.find((existing: any) => existing.id === b.id)) {
+          badges.push(b);
+          newBadgeWon = true;
+        }
+      });
+      if (newBadgeWon) {
+        localStorage.setItem('sms_badges', JSON.stringify(badges));
+        window.dispatchEvent(new Event('storage'));
+      }
+
       await setDoc(userRef, {
         stats: {
           [type]: firebaseIncrement(value)
-        }
+        },
+        lastActivity: now.toISOString(),
+        ...streakUpdate
+      }, { merge: true });
+
+      // SEC-02, NAMA-02: Record day-level aggregated submission for leaderboard rollups
+      const dateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD
+      const dailyRef = doc(db, 'sadhanaDaily', `${user.uid}-${dateStr}`);
+
+      await setDoc(dailyRef, {
+        uid: user.uid,
+        userName: user.name,
+        state: user.state || 'Other',
+        centre: user.centre || 'SSIOM',
+        type: type, // Keeps track of last activity type
+        count: firebaseIncrement(realChantCount),
+        timestamp: new Date().toISOString(),
+        date: dateStr,
+        publicLeaderboard: user.publicLeaderboard ?? true
       }, { merge: true });
     } catch (e) {
       console.error("Personal Firestore sync failed:", e);
@@ -94,12 +180,56 @@ const ChantingPage: React.FC = () => {
       return;
     }
 
+    if (formData.count <= 0) {
+      alert("Please enter a valid count greater than 0.");
+      return;
+    }
+
+    if (formData.count > 100000) {
+      alert("Count seems unusually high. Please verify and submit in smaller batches.");
+      return;
+    }
+
+    const type = chantingType === 'Gayathri' ? 'gayathri' : 'saiGayathri';
+    const lastSubmitTime = localStorage.getItem(`last_${type}_submit`);
+    if (lastSubmitTime && Date.now() - parseInt(lastSubmitTime) < 10000) {
+      if (!window.confirm("You just submitted this offering securely. Are you sure you want to duplicate it so soon?")) {
+        return;
+      }
+    }
+
     setIsSubmitting(true);
     setSubmissionError(null);
 
+    // Duplicate Check Query
+    if (user && navigator.onLine) {
+      try {
+        const todayISO = new Date().toISOString().split('T')[0];
+        const q = query(
+          collection(db, 'sadhanaDaily'),
+          where('uid', '==', user.uid),
+          where('type', '==', type),
+          where('count', '==', formData.count),
+          where('dateStr', '==', todayISO),
+          limit(1)
+        );
+        const dupSnap = await getDocs(q);
+        if (!dupSnap.empty) {
+          const confirmSubmit = window.confirm(`You already submitted an offering of ${formData.count} ${chantingType} chants today. Are you sure you want to submit this again?`);
+          if (!confirmSubmit) {
+            setIsSubmitting(false);
+            setFormData({ count: 108 });
+            return;
+          }
+        }
+      } catch (error) {
+        console.warn("Could not check for duplicates:", error);
+      }
+    }
+
     try {
-      const type = chantingType === 'Gayathri' ? 'gayathri' : 'saiGayathri';
       await updateStats(type, formData.count);
+      localStorage.setItem(`last_${type}_submit`, Date.now().toString());
       setShowSuccess(true);
       setTimeout(() => setShowSuccess(false), 3000);
       setFormData({ count: 108 });
@@ -110,19 +240,21 @@ const ChantingPage: React.FC = () => {
     }
   };
 
-  const handleJapamLineChange = (index: number, value: string) => {
-    const newLines = [...japamLines];
-    newLines[index] = value;
-    setJapamLines(newLines);
+  const getLikithaCount = (text: string) => {
+    const matches = text.match(/(om|aum)\s*sai\s*ram/gi);
+    return matches ? matches.length : 0;
+  };
 
-    if (user?.isGuest && index === 10 && newLines.every(l => l.trim().toLowerCase() === "om sai ram")) {
+  const completedLinesCount = getLikithaCount(likithaText);
+  const isJapamComplete = completedLinesCount >= 11;
+  const likithaUnitsToSubmit = Math.floor(completedLinesCount / 11);
+
+  const handleLikithaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setLikithaText(e.target.value);
+    if (user?.isGuest && getLikithaCount(e.target.value) >= 11) {
       setShowRegisterPrompt(true);
     }
   };
-
-  const isLineValid = (line: string) => line.trim().toLowerCase() === "om sai ram";
-  const completedLinesCount = japamLines.filter(isLineValid).length;
-  const isJapamComplete = completedLinesCount === 11;
 
   const handleLikithaSubmit = async () => {
     if (user?.isGuest) {
@@ -131,14 +263,64 @@ const ChantingPage: React.FC = () => {
     }
     if (!isJapamComplete) return;
 
+    const lastSubmitTime = localStorage.getItem(`last_likitha_submit`);
+    if (lastSubmitTime && Date.now() - parseInt(lastSubmitTime) < 10000) {
+      if (!window.confirm("You just submitted this offering securely. Are you sure you want to duplicate it so soon?")) {
+        return;
+      }
+    }
+
+    if (likithaUnitsToSubmit <= 0) {
+      alert("Please chant Om Sai Ram at least 11 times before offering.");
+      return;
+    }
+
     setIsSubmitting(true);
     setSubmissionError(null);
 
+    // Duplicate Check Query
+    if (user && navigator.onLine) {
+      try {
+        const todayISO = new Date().toISOString().split('T')[0];
+        const q = query(
+          collection(db, 'sadhanaDaily'),
+          where('uid', '==', user.uid),
+          where('type', '==', 'likitha'),
+          where('count', '==', likithaUnitsToSubmit * 11),
+          where('dateStr', '==', todayISO),
+          limit(1)
+        );
+        const dupSnap = await getDocs(q);
+        if (!dupSnap.empty) {
+          const confirmSubmit = window.confirm(`You already submitted an offering of ${likithaUnitsToSubmit * 11} Likitha Japam chants today. Are you sure you want to submit this again?`);
+          if (!confirmSubmit) {
+            setIsSubmitting(false);
+            setLikithaText('');
+            return;
+          }
+        }
+      } catch (error) {
+        console.warn("Could not check for duplicates:", error);
+      }
+    }
+
     try {
-      await updateStats('likitha', 1);
+      await updateStats('likitha', likithaUnitsToSubmit);
+      localStorage.setItem(`last_likitha_submit`, Date.now().toString());
       setShowSuccess(true);
+
+      // Attempt Confetti Animation
+      import('canvas-confetti').then((confetti) => {
+        confetti.default({
+          particleCount: 150,
+          spread: 80,
+          origin: { y: 0.6 },
+          colors: ['#D2AC47', '#ffdf00', '#ffffff', '#002E5B']
+        });
+      }).catch(() => { });
+
       setTimeout(() => setShowSuccess(false), 3000);
-      setJapamLines(Array(11).fill(''));
+      setLikithaText('');
     } catch (err: any) {
       setSubmissionError("Network error. Please try again.");
     } finally {
@@ -154,7 +336,7 @@ const ChantingPage: React.FC = () => {
   };
 
   const handleClearForm = () => {
-    setJapamLines(Array(11).fill(''));
+    setLikithaText('');
     setShowClearConfirm(false);
   };
 
@@ -210,7 +392,13 @@ const ChantingPage: React.FC = () => {
                   <Minus size={32} />
                 </button>
                 <div className="flex flex-col items-center">
-                  <input type="number" className="w-48 text-center text-7xl font-serif font-black text-navy-900 bg-transparent border-none focus:ring-0" value={formData.count} onChange={e => setFormData({ count: parseInt(e.target.value) || 0 })} />
+                  <input type="number" className="w-48 text-center text-7xl font-serif font-black text-navy-900 bg-transparent border-none focus:ring-0 outline-none" value={formData.count || ''} onChange={e => {
+                    let val = parseInt(e.target.value);
+                    if (isNaN(val)) val = 0;
+                    if (val < 0) val = 0;
+                    if (val > 1000000) val = 1000000;
+                    setFormData({ count: val });
+                  }} />
                   <div className="h-1.5 w-24 bg-gold-gradient rounded-full mt-2"></div>
                 </div>
                 <button onClick={increment} className="w-16 h-16 bg-neutral-50 rounded-full flex items-center justify-center hover:bg-navy-900 hover:text-white transition-all text-navy-300 border border-neutral-200">
@@ -240,36 +428,33 @@ const ChantingPage: React.FC = () => {
         <div id="tutorial-likitha-japam" className="bg-white p-10 rounded-bento text-navy-900 relative shadow-2xl flex flex-col border border-navy-50 overflow-hidden">
           <div className="absolute -top-10 -right-10 opacity-5 text-gold-500"><Sparkles size={300} /></div>
 
-          <div className="relative z-10 mb-8 text-center">
+          <div className="relative z-10 mb-8 text-center flex flex-col items-center">
             <h3 className="text-3xl font-serif font-bold text-gold-500 mb-2 leading-tight">Likitha Japam</h3>
-            <p className="text-navy-400 text-xs leading-relaxed font-bold uppercase tracking-widest">Type "Om Sai Ram" 11 times</p>
+            <p className="text-navy-400 text-xs leading-relaxed font-bold uppercase tracking-widest">Type "Om Sai Ram" 11 times = 1 Unit</p>
+            {user && !user.isGuest && (
+              <div className="mt-4 bg-navy-50 px-4 py-2 rounded-full inline-block border border-navy-100 shadow-sm">
+                <span className="text-xs font-bold text-navy-600">Total Units Offered: {JSON.parse(localStorage.getItem(`sms_stats_${user?.uid}`) || '{"likitha":0}').likitha}</span>
+              </div>
+            )}
           </div>
 
-          <div className="flex-grow space-y-3 overflow-y-auto pr-2 custom-scrollbar max-h-[480px]">
-            {japamLines.map((line, idx) => (
-              <div key={idx} className="flex items-center gap-4">
-                <span className="w-8 text-[10px] font-black text-navy-200 text-right">{idx + 1}.</span>
-                <div className="relative flex-grow">
-                  <input
-                    type="text"
-                    value={line}
-                    onChange={(e) => handleJapamLineChange(idx, e.target.value)}
-                    placeholder="Om Sai Ram"
-                    className={`w-full py-3 px-5 rounded-xl border transition-all outline-none font-serif italic text-lg ${isLineValid(line) ? 'border-teal-500 bg-teal-50 text-navy-900' : 'bg-neutral-50 border-navy-50 focus:border-gold-500'}`}
-                  />
-                  {isLineValid(line) && <Check size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-teal-600" />}
-                </div>
-              </div>
-            ))}
+          <div className="flex-grow space-y-3 pr-2 h-64 text-center">
+            <textarea
+              value={likithaText}
+              onChange={handleLikithaChange}
+              placeholder="Type 'Om Sai Ram' repeatedly here..."
+              className={`w-full h-full py-6 px-8 rounded-3xl border-2 transition-all outline-none font-serif italic text-2xl resize-none custom-scrollbar shadow-inner leading-loose
+              ${isJapamComplete ? 'border-teal-500 bg-teal-50 text-navy-900 focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10' : 'bg-neutral-50 border-navy-50 focus:border-gold-500 focus:bg-white'}`}
+            />
           </div>
 
           <div className="relative z-10 pt-8 mt-4 border-t border-navy-50">
             <div className="flex justify-between items-end mb-6">
               <div>
-                <span className="block text-[10px] uppercase tracking-widest text-navy-200 mb-1 font-black">Submission Progress</span>
+                <span className="block text-[10px] uppercase tracking-widest text-navy-200 mb-1 font-black">Valid Mantras Detected</span>
                 <div className="flex items-baseline gap-1">
-                  <span className="text-4xl font-black text-gold-500">{completedLinesCount}</span>
-                  <span className="text-xl text-navy-100">/ 11</span>
+                  <span className={`text-4xl font-black ${isJapamComplete ? 'text-teal-500' : 'text-gold-500'}`}>{completedLinesCount}</span>
+                  <span className="text-xl text-navy-100">/ {Math.max(11, Math.ceil((completedLinesCount + 1) / 11) * 11)}</span>
                 </div>
               </div>
               <button onClick={() => setShowClearConfirm(true)} className="text-[9px] font-black uppercase tracking-widest text-navy-200 hover:text-navy-900 underline">Clear Form</button>
@@ -281,7 +466,7 @@ const ChantingPage: React.FC = () => {
               className={`w-full py-5 font-black uppercase tracking-widest text-xs rounded-3xl shadow-xl transition-all ${user?.isGuest ? 'bg-navy-900/5 text-navy-300' : 'bg-gold-gradient text-navy-900 hover:scale-[1.01] shadow-gold-500/10 disabled:opacity-20'} ${isSubmitting ? 'animate-pulse' : ''}`}
             >
               {user?.isGuest ? <Lock size={18} className="inline mr-2" /> : <Send size={18} className="inline mr-2" />}
-              {isSubmitting ? 'Recording...' : 'Submit 1 Sacred Unit'}
+              {isSubmitting ? 'Recording...' : `Submit ${likithaUnitsToSubmit > 0 ? likithaUnitsToSubmit : 1} Sacred Unit${likithaUnitsToSubmit > 1 ? 's' : ''}`}
             </button>
           </div>
 

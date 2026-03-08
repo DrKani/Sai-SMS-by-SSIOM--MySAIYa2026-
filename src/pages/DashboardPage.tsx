@@ -1,100 +1,229 @@
 
 import React, { useState, useEffect } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
-import { Heart, BookOpen, Activity, Award, Trophy, Medal, Lock, ArrowRight, Check, Shield, Briefcase, FileText, CheckCircle2, Sparkles, PartyPopper } from 'lucide-react';
-import { Link, useLocation } from 'react-router-dom';
+import { Heart, BookOpen, Activity, Award, Trophy, Medal, Lock, ArrowRight, Check, Shield, Briefcase, FileText, CheckCircle2, Sparkles, PartyPopper, Users, Target, Mic, Flame } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import SaiAvatar from '../components/SaiAvatar';
-import { UserBriefcaseItem } from '../types';
+import { UserBriefcaseItem, UserProfile } from '../types';
 import { ToastContainer, useToast } from '../components/Toast';
 import confetti from 'canvas-confetti';
 import Skeleton from '../components/Skeleton';
+import { doc, onSnapshot, collection, query, where, getDocs, getDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import { subscribeToNationalStats, NationalStats } from '../lib/nationalStats';
 
 const DashboardPage: React.FC = () => {
-  const [user, setUser] = useState<any>(null);
-  const [stats, setStats] = useState({ gayathri: 0, saiGayathri: 0, likitha: 0, mantras: 0, booksRead: 0 });
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [stats, setStats] = useState({
+    gayathri: 0,
+    saiGayathri: 0,
+    likitha: 0,
+    mantras: 0,
+    booksRead: 0,
+    streak: 0
+  });
+
+  const [timeframe, setTimeframe] = useState<'today' | 'week' | 'month' | 'all-time'>('all-time');
+  const [timeframeStats, setTimeframeStats] = useState({
+    gayathri: 0,
+    saiGayathri: 0,
+    likitha: 0,
+    mantras: 0
+  });
+  const [nationalStats, setNationalStats] = useState<NationalStats | null>(null);
   const [completedWeeks, setCompletedWeeks] = useState<string[]>([]);
   const [badges, setBadges] = useState<any[]>([]);
   const [briefcase, setBriefcase] = useState<UserBriefcaseItem[]>([]);
   const location = useLocation();
+  const navigate = useNavigate();
   const { toasts, showToast, closeToast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
 
+  // Leaderboard Rank State
+  const [userRank, setUserRank] = useState<{ rank: number | null, score: number, totalRanked: number, loaded: boolean }>({ rank: null, score: 0, totalRanked: 0, loaded: false });
+
   useEffect(() => {
-    // Override scroll anchor jump
     window.scrollTo(0, 0);
-    const id = setTimeout(() => window.scrollTo(0, 0), 10);
-    return () => clearTimeout(id);
   }, []);
 
   useEffect(() => {
-    const saved = localStorage.getItem('sms_user');
-    if (saved) {
-      const userData = JSON.parse(saved);
-      setUser(userData);
+    const savedProfile = localStorage.getItem('sms_user');
+    if (!savedProfile) return;
 
-      if (!userData.isGuest) {
-        const localStats = JSON.parse(localStorage.getItem(`sms_stats_${userData.uid}`) || '{"gayathri":0, "saiGayathri":0, "likitha":0, "mantras":0}');
+    const initialUser = JSON.parse(savedProfile) as UserProfile;
+    setUser(initialUser);
+
+    if (initialUser.isGuest) {
+      navigate('/?guest_redirect=true');
+      return;
+    }
+
+    // 1. Real-time User Profile & Stats Subscription
+    const userRef = doc(db, 'users', initialUser.uid);
+    const unsubUser = onSnapshot(userRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const userData = docSnap.data() as UserProfile;
+        setUser(userData);
+
+        const localStats = JSON.parse(localStorage.getItem(`sms_stats_${initialUser.uid}`) || '{"gayathri":0, "saiGayathri":0, "likitha":0, "mantras":0}');
         const fbStats = userData.stats || { gayathri: 0, saiGayathri: 0, likitha: 0, mantras: 0 };
-        const mergedStats = {
+
+        const currentCompletions = JSON.parse(localStorage.getItem(`sms_completions`) || '[]');
+
+        setStats({
           gayathri: Math.max(localStats.gayathri || 0, fbStats.gayathri || 0),
           saiGayathri: Math.max(localStats.saiGayathri || 0, fbStats.saiGayathri || 0),
           likitha: Math.max(localStats.likitha || 0, fbStats.likitha || 0),
-          mantras: Math.max(localStats.mantras || 0, fbStats.mantras || 0)
-        };
-        const compWeeks = JSON.parse(localStorage.getItem(`sms_completions`) || '[]');
-        const userBadges = JSON.parse(localStorage.getItem(`sms_badges`) || '[]');
-        const userBriefcase = JSON.parse(localStorage.getItem(`sms_briefcase_${userData.uid}`) || '[]');
+          mantras: Math.max(localStats.mantras || 0, fbStats.mantras || 0),
+          streak: (userData as any).streak || 0,
+          booksRead: currentCompletions.length
+        });
 
-        setStats({ ...mergedStats, booksRead: compWeeks.length });
-        setCompletedWeeks(compWeeks);
-        setBadges(userBadges);
-        setBriefcase(userBriefcase.reverse()); // Newest first
+        setIsLoading(false);
       }
-    }
+    }, (err) => {
+      console.error("Dashboard User Snapshot Error:", err);
+      setIsLoading(false);
+    });
+
+    // 2. National Stats Subscription
+    const unsubNational = subscribeToNationalStats((newStats) => {
+      setNationalStats(newStats);
+    });
+
+    // 3. Load other local data
+    const compWeeks = JSON.parse(localStorage.getItem(`sms_completions`) || '[]');
+    const userBadges = JSON.parse(localStorage.getItem(`sms_badges`) || '[]');
+    const userBriefcase = JSON.parse(localStorage.getItem(`sms_briefcase_${initialUser.uid}`) || '[]');
+
+    setCompletedWeeks(compWeeks);
+    setBadges(userBadges);
+    setBriefcase(userBriefcase.reverse());
 
     // Check for welcome toasts
     const showNewWelcome = sessionStorage.getItem('sms_show_welcome') === 'new_user' || location.state?.isNew;
     const showReturningWelcome = sessionStorage.getItem('sms_show_welcome') === 'returning_user' || location.state?.isReturning;
 
-    if (showNewWelcome && saved) {
-      const userData = JSON.parse(saved);
-      const name = userData.name?.split(' ')[0] || 'Devotee';
-      const title = userData.gender === 'female' ? 'Sis' : 'Bro';
-
-      confetti({
-        particleCount: 100,
-        spread: 70,
-        origin: { y: 0.6 },
-        colors: ['#D4AF37', '#FFD700', '#FFF8DC']
-      });
-
-      setTimeout(() => {
-        showToast(`Welcome to Sai SMS, ${title} ${name}! Om Sai Ram!`, 'success', 5000);
-      }, 500);
-
+    if (showNewWelcome) {
+      const name = initialUser.name?.split(' ')[0] || 'Devotee';
+      const title = initialUser.gender === 'female' ? 'Sis' : 'Bro';
+      confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 }, colors: ['#D4AF37', '#FFD700'] });
+      setTimeout(() => showToast(`Welcome to Sai SMS, ${title} ${name}! Om Sai Ram!`, 'success', 5000), 500);
       sessionStorage.removeItem('sms_show_welcome');
-    } else if (showReturningWelcome && saved) {
-      const userData = JSON.parse(saved);
-      const name = userData.name?.split(' ')[0] || 'Devotee';
-      const title = userData.gender === 'female' ? 'Sis' : 'Bro';
-
-      setTimeout(() => {
-        showToast(`Om Sai Ram, ${title} ${name}! Welcome back.`, 'info', 4000);
-      }, 500);
-
+    } else if (showReturningWelcome) {
+      const name = initialUser.name?.split(' ')[0] || 'Devotee';
+      const title = initialUser.gender === 'female' ? 'Sis' : 'Bro';
+      setTimeout(() => showToast(`Om Sai Ram, ${title} ${name}! Welcome back.`, 'info', 4000), 500);
       sessionStorage.removeItem('sms_show_welcome');
     }
 
-    // Simulate async loading for skeleton demo
-    const loadId = setTimeout(() => setIsLoading(false), 600);
-    return () => clearTimeout(loadId);
+    return () => {
+      unsubUser();
+      unsubNational();
+    };
   }, [location.state]);
 
+  // Fetch National Rank
+  useEffect(() => {
+    const fetchRank = async () => {
+      try {
+        const mytDate = new Date(new Date().getTime() + 8 * 60 * 60 * 1000);
+        const todayStr = mytDate.toISOString().split('T')[0];
+        const docRef = doc(db, 'rollups', todayStr);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists() && user?.uid) {
+          const data = docSnap.data();
+          const members = data.byMember || [];
+          const idx = members.findIndex((m: any) => m.uid === user.uid);
+          setUserRank({
+            rank: idx >= 0 ? idx + 1 : null,
+            score: idx >= 0 ? members[idx].count : 0,
+            totalRanked: members.length,
+            loaded: true
+          });
+        } else {
+          setUserRank(prev => ({ ...prev, loaded: true }));
+        }
+      } catch (err) {
+        console.error("Error fetching rank:", err);
+        setUserRank(prev => ({ ...prev, loaded: true }));
+      }
+    };
+
+    if (user && !user.isGuest) {
+      fetchRank();
+    }
+  }, [user?.uid]);
+
+  // Fetch Timeframe Stats Whenever Timeframe changes
+  useEffect(() => {
+    if (!user || timeframe === 'all-time') {
+      setTimeframeStats({
+        gayathri: stats.gayathri,
+        saiGayathri: stats.saiGayathri,
+        likitha: stats.likitha,
+        mantras: stats.mantras
+      });
+      return;
+    }
+
+    const fetchTimeframeData = async () => {
+      try {
+        const q = query(collection(db, 'sadhanaDaily'), where('userId', '==', user.uid));
+        const snap = await getDocs(q);
+
+        const now = new Date();
+        const todayStr = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+
+        const currentWeekStart = new Date(now);
+        currentWeekStart.setDate(currentWeekStart.getDate() - currentWeekStart.getDay());
+        const weekStartStr = currentWeekStart.toISOString().split('T')[0];
+
+        const currentMonthPrefix = todayStr.substring(0, 7); // YYYY-MM
+
+        let tg = 0, tsg = 0, tl = 0, tm = 0;
+
+        snap.docs.forEach(d => {
+          const data = d.data();
+          const targetDate = data.date; // string YYYY-MM-DD
+          let include = false;
+
+          if (timeframe === 'today' && targetDate === todayStr) {
+            include = true;
+          } else if (timeframe === 'week' && targetDate >= weekStartStr && targetDate <= todayStr) {
+            include = true;
+          } else if (timeframe === 'month' && targetDate.startsWith(currentMonthPrefix)) {
+            include = true;
+          }
+
+          if (include) {
+            tg += data.gayathri || 0;
+            tsg += data.saiGayathri || 0;
+            tl += data.likitha || 0;
+            tm += data.mantras || 0;
+          }
+        });
+
+        setTimeframeStats({
+          gayathri: tg,
+          saiGayathri: tsg,
+          likitha: tl,
+          mantras: tm
+        });
+      } catch (err) {
+        console.error("Error fetching timeframe stats:", err);
+      }
+    };
+
+    fetchTimeframeData();
+  }, [timeframe, user, stats]); // re-run if all-time stats update
+
   const chartData = [
-    { name: 'Gayathri', value: stats.gayathri, color: '#ea7600' },
-    { name: 'S.S. Gayathri', value: stats.saiGayathri, color: '#bf0449' },
-    { name: 'Mantras', value: stats.mantras, color: '#5726bf' },
-    { name: 'Likitha', value: stats.likitha * 11, color: '#1d4ed8' },
+    { name: 'Gayathri', value: timeframeStats.gayathri, color: '#ea7600' },
+    { name: 'S.S. Gayathri', value: timeframeStats.saiGayathri, color: '#bf0449' },
+    { name: 'Mantras', value: timeframeStats.mantras, color: '#5726bf' },
+    { name: 'Likitha', value: timeframeStats.likitha * 11, color: '#1d4ed8' },
   ];
 
   if (isLoading) {
@@ -125,7 +254,7 @@ const DashboardPage: React.FC = () => {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-16 space-y-12 relative">
+    <div className="max-w-7xl mx-auto px-4 py-16 space-y-12 relative animate-in fade-in duration-500">
       <ToastContainer toasts={toasts} onClose={closeToast} />
 
       {user?.isGuest && (
@@ -139,6 +268,7 @@ const DashboardPage: React.FC = () => {
           </Link>
         </div>
       )}
+
       <div className="flex flex-col md:flex-row justify-between items-end gap-6 text-center md:text-left">
         <div className="flex items-center gap-6">
           <div className="hidden md:block p-1 bg-gold-gradient rounded-full shadow-lg">
@@ -149,7 +279,16 @@ const DashboardPage: React.FC = () => {
             <p className="text-navy-500 font-medium">Om Sai Ram, {user?.gender === 'female' ? 'Sis.' : 'Bro.'} {user?.name?.replace(/^(Sis|Bro|Brother|Sister)\.?\s+/i, '').split(' ')[0] || user?.name}. Your sacred growth in 2026.</p>
           </div>
         </div>
-        <div className="flex flex-col items-end gap-2">
+
+        <div className="flex gap-4">
+          <div className="bg-orange-500 text-white px-6 py-3 rounded-3xl flex items-center gap-3 shadow-lg shadow-orange-500/20 animate-bounce-subtle">
+            <Flame size={20} className="fill-current" />
+            <div className="text-left">
+              <span className="block text-[8px] font-black uppercase tracking-widest opacity-70">Daily Streak</span>
+              <span className="text-lg font-black">{stats.streak} Days</span>
+            </div>
+          </div>
+
           <div className="bg-white/50 backdrop-blur border border-navy-50 p-4 rounded-3xl flex items-center gap-3">
             <Award size={20} className="text-gold-500" />
             <div className="text-left">
@@ -160,11 +299,52 @@ const DashboardPage: React.FC = () => {
         </div>
       </div>
 
+      {/* National Quick View */}
+      {nationalStats && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-navy-900 p-6 rounded-3xl text-white flex items-center gap-6 group hover:translate-y-[-2px] transition-all">
+            <div className="p-4 bg-white/10 rounded-2xl group-hover:scale-110 transition-transform"><Users size={24} className="text-gold-500" /></div>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-navy-300">National Participants</p>
+              <p className="text-2xl font-black">{nationalStats.totalParticipants.toLocaleString()}</p>
+            </div>
+          </div>
+          <div className="bg-[#bf0449] p-6 rounded-3xl text-white flex items-center gap-6 group hover:translate-y-[-2px] transition-all">
+            <div className="p-4 bg-white/10 rounded-2xl group-hover:scale-110 transition-transform"><Mic size={24} className="text-white" /></div>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-white/70">Total National Chants</p>
+              <p className="text-2xl font-black">{nationalStats.totalChants.toLocaleString()}</p>
+            </div>
+          </div>
+          <div className="bg-[#009688] p-6 rounded-3xl text-white flex items-center gap-6 group hover:translate-y-[-2px] transition-all">
+            <div className="p-4 bg-white/10 rounded-2xl group-hover:scale-110 transition-transform"><Target size={24} className="text-white" /></div>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-white/70">National Goal Progress</p>
+              <p className="text-2xl font-black">{nationalStats.goalPercent}%</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
         <div className="lg:col-span-2 space-y-8">
           {/* Namasmarana Chart */}
           <div className="bg-white p-10 rounded-bento shadow-xl border border-navy-50">
-            <h3 className="text-2xl font-serif font-bold text-navy-900 mb-8">Namasmarana Distribution</h3>
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+              <h3 className="text-2xl font-serif font-bold text-navy-900">Namasmarana Distribution</h3>
+              <div className="flex bg-neutral-100 p-1 rounded-xl">
+                {(['today', 'week', 'month', 'all-time'] as const).map(t => (
+                  <button
+                    key={t}
+                    onClick={() => setTimeframe(t)}
+                    className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${timeframe === t ? 'bg-white text-navy-900 shadow border border-navy-50' : 'text-navy-400 hover:text-navy-900'}`}
+                  >
+                    {t.replace('-', ' ')}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="h-64 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData}>
@@ -224,60 +404,60 @@ const DashboardPage: React.FC = () => {
               )}
             </div>
           </div>
-
-          {/* AC-WS-P3: WordSearch Gems Shelf */}
-          <div className="bg-white p-10 rounded-bento shadow-xl border border-navy-50">
-            <div className="flex items-center justify-between mb-8">
-              <div className="flex items-center gap-4">
-                <Link to="/games" className="p-3 bg-gold-gradient text-navy-900 rounded-2xl hover:scale-105 transition-transform"><Sparkles size={24} /></Link>
-                <div>
-                  <h3 className="text-2xl font-serif font-bold text-navy-900">WordSearch Gems</h3>
-                  <p className="text-xs text-navy-400 font-bold uppercase tracking-widest">Divine Wisdom Collected</p>
-                </div>
-              </div>
-              <div className="bg-navy-50 px-4 py-2 rounded-xl">
-                <span className="text-[10px] font-black uppercase text-navy-300 block">Total Gems</span>
-                <span className="text-xl font-black text-navy-900">{briefcase.filter(i => i.type === 'word_card').length} / 30</span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-              {briefcase.filter(i => i.type === 'word_card').length === 0 ? (
-                <div className="col-span-full text-center py-10 bg-neutral-50 rounded-3xl border-2 border-dashed border-navy-100">
-                  <p className="text-sm font-medium text-navy-500 mb-6">No divine gems collected yet. Find them in the Word Search!</p>
-                  <Link to="/games" className="inline-block px-6 py-2.5 bg-gold-gradient text-navy-900 rounded-full text-[10px] font-black uppercase tracking-widest hover:scale-105 transition-transform shadow-lg">Play Word Search</Link>
-                </div>
-              ) : (
-                briefcase.filter(i => i.type === 'word_card').slice(0, 8).map(gem => (
-                  <div key={gem.id} className="p-4 bg-navy-900 rounded-2xl text-center group hover:scale-105 transition-all shadow-lg border border-gold-500/20">
-                    <div className="w-10 h-10 bg-gold-gradient rounded-full flex items-center justify-center mx-auto mb-2 text-[#002E5B] shadow-inner">
-                      <Sparkles size={16} />
-                    </div>
-                    <p className="text-[10px] font-black text-gold-500 uppercase tracking-tighter truncate">{gem.title}</p>
-                  </div>
-                ))
-              )}
-            </div>
-            {briefcase.filter(i => i.type === 'word_card').length > 8 && (
-              <p className="text-center mt-6 text-[10px] font-black uppercase text-navy-300 tracking-[0.2em]">View more in your Briefcase above</p>
-            )}
-          </div>
-
         </div>
 
         {/* Sidebar: Badges & Summary */}
         <div className="space-y-8">
+
+          {/* National Standing Rank Card */}
+          {!user?.isGuest && userRank.loaded && (
+            <div className="bg-gold-gradient p-[1px] rounded-bento shadow-xl hover:-translate-y-1 transition-transform group">
+              <div className="bg-navy-900 rounded-[calc(24px-1px)] p-8 text-white text-center relative overflow-hidden">
+                <div className="absolute -top-10 -right-10 opacity-5 group-hover:scale-110 transition-transform duration-700">
+                  <Trophy size={150} />
+                </div>
+                <div className="relative z-10">
+                  <Trophy size={40} className="text-gold-500 mx-auto mb-4 drop-shadow-lg" />
+                  <h3 className="text-lg font-serif font-bold mb-2">National Standing</h3>
+
+                  {userRank.rank ? (
+                    <div className="mb-6">
+                      <div className="flex items-end justify-center gap-1 mb-1">
+                        <span className="text-xl font-bold text-gold-500 pb-1">#</span>
+                        <span className="text-5xl font-black text-gold-500 leading-none">{userRank.rank}</span>
+                      </div>
+                      <p className="text-[9px] text-navy-300 font-bold uppercase tracking-widest">
+                        Out of {userRank.totalRanked} Devotees
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="mb-6 py-2">
+                      <p className="text-xl font-black text-white/80 mb-1">Unranked</p>
+                      <p className="text-[9px] text-navy-400 font-bold uppercase tracking-widest leading-relaxed">
+                        Top 50 Rank Required<br />Begin your Sadhana
+                      </p>
+                    </div>
+                  )}
+
+                  <Link to="/?tab=devotees" className="inline-block w-full py-3 bg-white/10 hover:bg-white/20 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors border border-white/5 shadow-inner">
+                    View Leaderboard
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div id="tutorial-dashboard" className="bg-navy-900 p-10 rounded-bento text-white shadow-2xl relative overflow-hidden">
             <div className="absolute top-0 right-0 p-10 opacity-10"><Activity size={120} /></div>
-            <h3 className="text-xl font-bold mb-6 text-gold-500">Sacred Summary</h3>
+            <h3 className="text-xl font-bold mb-6 text-gold-500">Sacred Summary {timeframe !== 'all-time' ? `(${timeframe})` : ''}</h3>
             <div className="space-y-6">
               <Link to="/namasmarana" className="flex justify-between items-center pb-4 border-b border-white/10 group cursor-pointer hover:bg-white/5 rounded-lg p-2 transition-colors">
                 <span className="text-xs text-navy-300 font-bold uppercase group-hover:text-gold-500 transition-colors">Total Chants</span>
-                <span className="text-2xl font-black text-gold-500">{(stats.gayathri + stats.saiGayathri + (stats.likitha * 11)).toLocaleString()}</span>
+                <span className="text-2xl font-black text-gold-500">{(timeframeStats.gayathri + timeframeStats.saiGayathri + (timeframeStats.likitha * 11)).toLocaleString()}</span>
               </Link>
               <Link to="/namasmarana" className="flex justify-between items-center pb-4 border-b border-white/10 group cursor-pointer hover:bg-white/5 rounded-lg p-2 transition-colors">
                 <span className="text-xs text-navy-300 font-bold uppercase group-hover:text-gold-500 transition-colors">Japam Units</span>
-                <span className="text-2xl font-black text-white">{stats.likitha}</span>
+                <span className="text-2xl font-black text-white">{timeframeStats.likitha}</span>
               </Link>
               <Link to="/book-club" className="flex justify-between items-center group cursor-pointer hover:bg-white/5 rounded-lg p-2 transition-colors">
                 <span className="text-xs text-navy-300 font-bold uppercase group-hover:text-gold-500 transition-colors">Chapters Read</span>
@@ -308,6 +488,19 @@ const DashboardPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <style>{`
+        @keyframes bounce-subtle {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-4px); }
+        }
+        .animate-bounce-subtle {
+            animation: bounce-subtle 2s ease-in-out infinite;
+        }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f0f4f8; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #d2ac47; border-radius: 10px; }
+      `}</style>
     </div>
   );
 };

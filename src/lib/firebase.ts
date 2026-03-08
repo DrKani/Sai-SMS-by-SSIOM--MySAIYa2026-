@@ -1,9 +1,10 @@
 
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, setPersistence, browserLocalPersistence } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { getAnalytics, isSupported } from "firebase/analytics";
+import { getMessaging, isSupported as isMessagingSupported } from "firebase/messaging";
 
 // Config will be populated after app creation or from environment variables
 // For now, we set up the structure to be ready for the config values
@@ -29,11 +30,28 @@ setPersistence(auth, browserLocalPersistence).catch((error) => {
 });
 
 export const googleProvider = new GoogleAuthProvider();
-export const db = getFirestore(app);
+
+// Initialize Firestore with offline persistence
+export const db = initializeFirestore(app, {
+    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+});
+
 export const storage = getStorage(app);
 
 // Analytics defaults to null if not supported (e.g. in some SSR contexts or restricted environments)
 export let analytics = null;
 isSupported().then(yes => yes && (analytics = getAnalytics(app)));
+
+// Messaging
+export let messaging = null;
+isMessagingSupported().then(yes => {
+    if (yes) {
+        try {
+            messaging = getMessaging(app);
+        } catch (e) {
+            console.error('Failed to initialize messaging', e);
+        }
+    }
+});
 
 export default app;

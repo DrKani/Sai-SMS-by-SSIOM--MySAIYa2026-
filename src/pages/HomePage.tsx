@@ -11,24 +11,24 @@ import QuoteSlider from '../components/QuoteSlider';
 import SaiAvatar from '../components/SaiAvatar';
 import CollectivePrayerSection from '../components/CollectivePrayerSection';
 import { subscribeToNationalStats, NationalStats } from '../lib/nationalStats';
+import HomeLeaderboard from '../components/HomeLeaderboard';
 
-// ── Sub-components ──────────────────────────────────────────────────────────
-
-const TileCard: React.FC<{
-  to: string; icon: React.ReactNode; label: string; sub: string;
-  color: string; textColor?: string;
-}> = ({ to, icon, label, sub, color, textColor = 'text-white' }) => (
-  <Link
-    to={to}
-    className={`${color} ${textColor} p-10 rounded-[2.5rem] shadow-xl hover:-translate-y-2 hover:shadow-2xl transition-all flex flex-col items-center text-center gap-6 group relative overflow-hidden`}
-  >
-    <div className="absolute top-0 right-0 p-12 bg-white/5 -mr-12 -mt-12 rounded-full group-hover:scale-150 transition-transform duration-700" />
-    <div className="p-6 bg-white/10 rounded-[2rem] group-hover:scale-110 transition-transform shadow-inner relative z-10 border border-white/10">
-      {icon}
+const FeatureCard: React.FC<{
+  to: string; icon: React.ReactNode; label: string; title: string; description: string; cardClass: string; btnText: string;
+}> = ({ to, icon, label, title, description, cardClass, btnText }) => (
+  <Link to={to} className={`feature-card ${cardClass}`}>
+    <div className="feature-card__banner">
+      <div className="feature-card__banner-icon">
+        {icon}
+      </div>
+      <span className="feature-card__banner-label">{label}</span>
+      <h3 className="feature-card__banner-title">{title}</h3>
     </div>
-    <div className="relative z-10">
-      <h3 className="text-2xl font-serif font-bold mb-2 leading-tight">{label}</h3>
-      <p className="text-[10px] opacity-80 uppercase tracking-widest font-black leading-tight">{sub}</p>
+    <div className="feature-card__body">
+      <p className="feature-card__description">{description}</p>
+      <div style={{ marginTop: 'auto' }}>
+        <span className="feature-card__btn">{btnText}</span>
+      </div>
     </div>
   </Link>
 );
@@ -105,13 +105,10 @@ const HomePage: React.FC = () => {
 
       {/* Welcome Callout */}
       <section className="w-full">
-        <div className="bg-navy-900 rounded-[2.5rem] shadow-2xl border-4 border-gold-500 overflow-hidden relative">
-          <div className="absolute top-0 left-0 w-full h-2 bg-gold-gradient" />
-          <div className="p-10 md:p-14 text-center">
-            <p className="text-white text-base md:text-lg lg:text-xl font-medium leading-relaxed max-w-5xl mx-auto">
-              {siteContent.homeWelcomeText}
-            </p>
-          </div>
+        <div className="welcome-card p-10 md:p-14 text-center">
+          <p className="text-white text-base md:text-lg lg:text-xl font-medium leading-relaxed max-w-5xl mx-auto">
+            {siteContent.homeWelcomeText}
+          </p>
         </div>
       </section>
 
@@ -146,15 +143,72 @@ const HomePage: React.FC = () => {
         </section>
       )}
 
-      {/* Primary Action Tiles */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        <TileCard to="/namasmarana" icon={<Mic size={40} />} label="Namasmarana" sub="Submit Mantra Count" color="bg-[#ea7600]" />
-        <TileCard to="/book-club" icon={<Library size={40} />} label="Book Club" sub="Weekly Readings & Reflections" color="bg-[#bf0449]" />
-        <TileCard to="/dashboard" icon={<Target size={40} />} label="Personal Dashboard" sub="My Progress 2026" color="bg-[#5726bf]" />
+      {/* Feature Navigation Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+        <FeatureCard
+          to="/namasmarana"
+          icon={<Mic size={24} color="white" />}
+          label="Mantra Count"
+          title="Namasmarana"
+          description="Log your daily chanting and contribute to the national 2026 offering."
+          cardClass="card-namasmarana"
+          btnText="Log Sadhana"
+        />
+        <FeatureCard
+          to="/book-club"
+          icon={<Library size={24} color="white" />}
+          label="Weekly Reading"
+          title="Sai Lit Club"
+          description="Join the national reading journey. Read weekly chapters and share reflections."
+          cardClass="card-book-club"
+          btnText="Read Now"
+        />
+        <FeatureCard
+          to="/dashboard"
+          icon={<Target size={24} color="white" />}
+          label="Progress Tracker"
+          title="Personal Dashboard"
+          description="View your streak, annual goals, milestones and personal achievements."
+          cardClass="card-dashboard"
+          btnText="View Stats"
+        />
+        <FeatureCard
+          to="/journal"
+          icon={<ScrollText size={24} color="white" />}
+          label="My Journal"
+          title="Reflections"
+          description="Capture your spiritual insights privately and deepen your daily practice."
+          cardClass="card-reflections"
+          btnText="Open Journal"
+        />
+        <FeatureCard
+          to="/games"
+          icon={<Gamepad2 size={24} color="white" />}
+          label="Interactive Games"
+          title="Play Zone"
+          description="Life is a game, play it! Test your knowledge with crosswords and quizzes."
+          cardClass="card-play"
+          btnText="Play Games"
+        />
+        <FeatureCard
+          to="/calendar"
+          icon={<Calendar size={24} color="white" />}
+          label="Upcoming"
+          title="SMS Events"
+          description="Stay updated with the national spiritual calendar and collective sessions."
+          cardClass="card-events"
+          btnText="View Calendar"
+        />
       </div>
 
       {/* Our Collective Prayer — National Counter + Centre Leaderboard + Personal Rank */}
       <CollectivePrayerSection globalStats={globalStats} user={user} />
+
+      {/* Our Collective Offering — Leaderboard section: always public, no auth gate */}
+      <HomeLeaderboard
+        globalTotalChants={globalStats?.totalChants || 0}
+        globalTotalParticipants={globalStats?.totalParticipants || 0}
+      />
 
       {/* Devotee Reflections */}
       {approvedReflections.length > 0 && (
@@ -189,12 +243,7 @@ const HomePage: React.FC = () => {
         </section>
       )}
 
-      {/* Secondary Action Tiles */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        <TileCard to="/journal" icon={<ScrollText size={40} />} label="My Reflections" sub="Capture your insights, deepen your practice" color="bg-navy-900" />
-        <TileCard to="/games" icon={<Gamepad2 size={40} />} label="Play it" sub="Life is a Game, Play it. Celebrate Life with interesting quizzes and games." color="bg-[#D2AC47]" textColor="text-navy-900" />
-        <TileCard to="/calendar" icon={<Calendar size={40} />} label="SMS Events" sub="National Spiritual Calendar" color="bg-[#0367a6]" />
-      </div>
+
 
       <section className="w-full">
         <QuoteSlider />

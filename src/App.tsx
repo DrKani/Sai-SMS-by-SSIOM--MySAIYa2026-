@@ -1,15 +1,15 @@
 import React, { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { onAuthStateChanged, signOut, sendEmailVerification, User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, onSnapshot, collection, query, where, orderBy, writeBatch } from 'firebase/firestore';
 import { auth, db } from './lib/firebase';
 import TutorialOverlay, { TutorialStep } from './components/TutorialOverlay';
 import {
   Menu, X, Bell, LogOut, ChevronRight, Search,
   MapPin, ShieldCheck, UserCircle,
-  Home, ArrowUp, Phone, LogIn,
+  Home, Activity, Phone, LogIn,
   Megaphone, Calendar, Sparkles, CheckCheck,
-  Library, Gamepad2, Heart, MessageSquare, Activity, Loader2,
+  Library, Gamepad2, Heart, MessageSquare, Loader2, Trophy,
   ExternalLink,
   MessageCircle,
   Globe,
@@ -24,10 +24,11 @@ import {
   Youtube,
   Instagram,
   Facebook,
-  Music
+  Music,
+  BookOpen
 } from 'lucide-react';
 
-import { UserProfile, Announcement, BrandingConfig, SiteContent } from './types';
+import { UserProfile, Announcement, BrandingConfig, SiteContent, AppNotification } from './types';
 import { ANNUAL_STUDY_PLAN, APP_CONFIG, ADMIN_CONFIG, DEFAULT_SITE_CONTENT } from './constants';
 
 import NotificationDrawer from './components/NotificationDrawer';
@@ -40,6 +41,8 @@ import NotificationBell from './components/NotificationBell';
 import MultiFunctionFAB from './components/MultiFunctionFAB';
 import EnhancedTickerBar from './components/EnhancedTickerBar';
 import Footer from './components/Footer';
+import OfflineBanner from './components/OfflineBanner';
+import { usePushNotifications } from './hooks/usePushNotifications';
 
 // Lazy load pages
 const HomePage = lazy(() => import('./pages/HomePage'));
@@ -54,13 +57,19 @@ const SignupPage = lazy(() => import('./pages/SignupPage'));
 const SetupPage = lazy(() => import('./pages/SetupPage'));
 const AnnouncementsPage = lazy(() => import('./pages/AnnouncementsPage'));
 const JournalPage = lazy(() => import('./pages/JournalPage'));
+const LeaderboardPage = lazy(() => import('./pages/LeaderboardPage'));
 const CalendarPage = lazy(() => import('./pages/CalendarPage'));
 const TermsOfUse = lazy(() => import('./pages/TermsOfUse'));
 const CookiePolicy = lazy(() => import('./pages/CookiePolicy'));
 const Copyright = lazy(() => import('./pages/Copyright'));
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
 const CommunityGuidelines = lazy(() => import('./pages/CommunityGuidelines'));
 const ContentSubmissionGuidelines = lazy(() => import('./pages/ContentSubmissionGuidelines'));
+const EventsPage = lazy(() => import('./pages/EventsPage'));
+const EventDetailPage = lazy(() => import('./pages/EventDetailPage'));
+const ContactPage = lazy(() => import('./pages/ContactPage'));
+const ArticlesPage = lazy(() => import('./pages/ArticlesPage'));
 
 const PageLoader = () => (
   <div className="flex-grow flex items-center justify-center min-h-[60vh]">
@@ -71,9 +80,15 @@ const PageLoader = () => (
   </div>
 );
 
-const ProtectedRoute = ({ children, user }: { children: React.ReactNode, user: UserProfile | null }) => {
+const ProtectedRoute = ({ children, user, allowGuest = false }: { children: React.ReactNode, user: UserProfile | null, allowGuest?: boolean }) => {
   const location = useLocation();
-  if (!user) return <Navigate to="/signin" replace />;
+  if (!user) return <Navigate to="/signin" state={{ from: location }} replace />;
+
+  // Block guests from non-guest pages
+  if (user.isGuest && !allowGuest) {
+    return <Navigate to="/signup" state={{ from: location, message: "Sign up to unlock this feature!" }} replace />;
+  }
+
   const isEffectivelyOnboarded = user.onboardingDone || (!!user.name && user.name !== 'Devotee' && !!user.state);
   if (!isEffectivelyOnboarded && location.pathname !== '/setup' && !user.isGuest) return <Navigate to="/setup" replace />;
   if (isEffectivelyOnboarded && location.pathname === '/setup' && !user.isGuest) return <Navigate to="/dashboard" replace />;
@@ -158,39 +173,61 @@ const Layout: React.FC = () => {
   });
   const [isAuthChecking, setIsAuthChecking] = useState(() => !localStorage.getItem('sms_user'));
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [readNotifIds, setReadNotifIds] = useState<string[]>(() => {
-    const saved = localStorage.getItem('sms_read_notifications');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const { permissionStatus, requestPermission } = usePushNotifications(user);
 
   useEffect(() => {
+    let profileUnsubscribe: (() => void) | null = null;
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (profileUnsubscribe) {
+        profileUnsubscribe();
+        profileUnsubscribe = null;
+      }
+
       if (firebaseUser) {
         try {
           const docRef = doc(db, 'users', firebaseUser.uid);
-          const docSnap = await getDoc(docRef);
-          let profileData: Partial<UserProfile> = docSnap.exists() ? docSnap.data() as UserProfile : {};
-          const adminEmail = firebaseUser.email?.toLowerCase();
-          const isAdminUser = adminEmail && ADMIN_CONFIG.AUTHORIZED_EMAILS.includes(adminEmail);
-          const profile: UserProfile = {
-            uid: firebaseUser.uid,
-            name: profileData.name || firebaseUser.displayName || 'Devotee',
-            email: firebaseUser.email || '',
-            photoURL: profileData.photoURL || firebaseUser.photoURL || APP_CONFIG.AVATAR_MALE,
-            joinedAt: profileData.joinedAt || new Date().toISOString(),
-            isGuest: firebaseUser.isAnonymous,
-            isAdmin: !!isAdminUser,
-            onboardingDone: !!profileData.onboardingDone,
-            onboardedApp: !!profileData.onboardedApp,
-            state: profileData.state || '',
-            centre: profileData.centre || '',
-            ...profileData
-          };
-          setUser(profile);
-          localStorage.setItem('sms_user', JSON.stringify(profile));
-          if (!profile.onboardedApp && !profile.isGuest) setTimeout(() => setShowAppTutorial(true), 1500);
+
+          // SEC-04: Admin routes protected by Firebase custom claims AND client-side guard
+          let claims: any = {};
+          try {
+            const tokenResult = await firebaseUser.getIdTokenResult();
+            claims = tokenResult.claims;
+          } catch (e) {
+            console.error("Custom claims fetch error", e);
+          }
+
+          // Use onSnapshot for real-time profile updates (streaks, badges, etc.)
+          profileUnsubscribe = onSnapshot(docRef, (docSnap) => {
+            let profileData: Partial<UserProfile> = docSnap.exists() ? docSnap.data() as UserProfile : {};
+            const adminEmail = firebaseUser.email?.toLowerCase();
+            const isAdminUser = claims.admin || profileData.isAdmin || (adminEmail && ADMIN_CONFIG.AUTHORIZED_EMAILS.includes(adminEmail));
+            const profile: UserProfile = {
+              uid: firebaseUser.uid,
+              name: profileData.name || firebaseUser.displayName || 'Devotee',
+              email: firebaseUser.email || '',
+              photoURL: profileData.photoURL || firebaseUser.photoURL || APP_CONFIG.AVATAR_MALE,
+              joinedAt: profileData.joinedAt || new Date().toISOString(),
+              isGuest: firebaseUser.isAnonymous,
+              isAdmin: !!isAdminUser,
+              onboardingDone: !!profileData.onboardingDone,
+              onboardedApp: !!profileData.onboardedApp,
+              state: profileData.state || '',
+              centre: profileData.centre || '',
+              ...profileData
+            };
+            setUser(profile);
+            localStorage.setItem('sms_user', JSON.stringify(profile));
+
+            // Show tutorial if not done
+            if (!profile.onboardedApp && !profile.isGuest && !showAppTutorial) {
+              setTimeout(() => setShowAppTutorial(true), 1500);
+            }
+          }, (error) => {
+            console.error("Profile snapshot error:", error);
+          });
         } catch (error) {
-          console.error("Error fetching user profile:", error);
+          console.error("Error setting up profile snapshot:", error);
           setUser({ uid: firebaseUser.uid, name: firebaseUser.displayName || 'Devotee', email: firebaseUser.email || '', photoURL: firebaseUser.photoURL || APP_CONFIG.AVATAR_MALE, joinedAt: new Date().toISOString(), isGuest: firebaseUser.isAnonymous, isAdmin: false, state: '', onboardingDone: false, centre: '' });
         }
       } else {
@@ -209,8 +246,6 @@ const Layout: React.FC = () => {
       if (brand) setBranding(JSON.parse(brand));
       const msg = localStorage.getItem('sms_ticker_message');
       if (msg) setTickerMessage(msg);
-      const anns = JSON.parse(localStorage.getItem('sms_announcements') || '[]');
-      setAnnouncements(anns);
       const content = localStorage.getItem('sms_site_content');
       if (content) setSiteContent(JSON.parse(content));
     };
@@ -219,13 +254,43 @@ const Layout: React.FC = () => {
     const handleScroll = () => setShowScrollTop(window.scrollY > 400);
     window.addEventListener('scroll', handleScroll);
     window.addEventListener('storage', refreshData);
+
+    const unsubAnnouncements = onSnapshot(
+      query(collection(db, 'announcements'), orderBy('timestamp', 'desc')),
+      (snapshot) => {
+        const anns = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Announcement));
+        setAnnouncements(anns);
+      },
+      (error) => console.error("Announcements fetch error:", error)
+    );
+
+    let unsubNotifications: () => void = () => { };
+    if (user && !user.isGuest) {
+      const q = query(
+        collection(db, 'notifications'),
+        where('uid', '==', user.uid),
+        orderBy('createdAt', 'desc')
+      );
+      unsubNotifications = onSnapshot(q, (snapshot) => {
+        const notifs = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as AppNotification[];
+        setNotifications(notifs);
+      });
+    } else {
+      setNotifications([]);
+    }
+
     return () => {
       unsubscribe();
+      unsubNotifications();
+      unsubAnnouncements();
       clearTimeout(authTimeout);
       window.removeEventListener('scroll', handleScroll);
       window.removeEventListener('storage', refreshData);
     };
-  }, []);
+  }, [user?.uid, user?.isGuest]);
 
   const handleLogout = async () => {
     try {
@@ -250,7 +315,27 @@ const Layout: React.FC = () => {
     }
   };
 
-  const unreadCount = announcements.filter(a => !readNotifIds.includes(a.id)).length;
+  const unreadCount = notifications.filter(n => !n.isRead).length;
+
+  const handleMarkRead = async (id: string) => {
+    try {
+      await updateDoc(doc(db, 'notifications', id), { isRead: true });
+    } catch (error) {
+      console.error('Error marking read:', error);
+    }
+  };
+
+  const handleClearAll = async () => {
+    try {
+      const batch = writeBatch(db);
+      notifications.filter(n => !n.isRead && n.id).forEach(n => {
+        batch.update(doc(db, 'notifications', n.id as string), { isRead: true });
+      });
+      await batch.commit();
+    } catch (error) {
+      console.error('Error clearing notifications:', error);
+    }
+  };
   const isAdmin = user && !user.isGuest && (user.isAdmin || (user.email && ADMIN_CONFIG.AUTHORIZED_EMAILS.map((e: string) => e.toLowerCase()).includes(user.email.toLowerCase())));
 
   const searchResults = useMemo(() => {
@@ -263,7 +348,8 @@ const Layout: React.FC = () => {
       { title: 'Personal Dashboard', link: '/dashboard', category: 'Progress', icon: <Activity size={18} />, color: 'bg-indigo-50 text-indigo-600' },
       { title: 'Games & Puzzles', link: '/games', category: 'Edutainment', icon: <Gamepad2 size={18} />, color: 'bg-gold-50 text-gold-700' },
       { title: 'Spiritual Journal', link: '/journal', category: 'Sadhana', icon: <ScrollText size={18} />, color: 'bg-teal-50 text-teal-600' },
-      { title: 'Events Calendar', link: '/calendar', category: 'National', icon: <Calendar size={18} />, color: 'bg-blue-50 text-blue-600' }
+      { title: 'Events Calendar', link: '/calendar', category: 'National', icon: <Calendar size={18} />, color: 'bg-blue-50 text-blue-600' },
+      { title: 'Articles & Reflections', link: '/articles', category: 'Knowledge', icon: <PenTool size={18} />, color: 'bg-purple-50 text-purple-600' }
     ];
     pages.forEach(p => { if (p.title.toLowerCase().includes(lowerQ)) matches.push(p); });
     ANNUAL_STUDY_PLAN.forEach(w => {
@@ -278,7 +364,16 @@ const Layout: React.FC = () => {
 
   return (
     <div className="flex flex-col min-h-screen">
+      <svg width="0" height="0" className="absolute pointer-events-none">
+        <defs>
+          <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop stopColor="#D2AC47" offset="0%" />
+            <stop stopColor="#F7EF8A" offset="100%" />
+          </linearGradient>
+        </defs>
+      </svg>
       <NavigationListener onNavigate={() => { setSearchQuery(""); setIsSearchOpen(false); setIsMenuOpen(false); }} />
+      <OfflineBanner />
       <CookieConsent />
       <MultiFunctionFAB showScrollTop={showScrollTop} onScrollTop={() => window.scrollTo({ top: 0, behavior: 'smooth' })} />
       <EnhancedTickerBar message={tickerMessage} onClickMessage={() => navigate('/announcements')} />
@@ -289,30 +384,43 @@ const Layout: React.FC = () => {
         </div>
       )}
 
-      <header className="sticky top-10 z-[50] bg-white shadow-md h-20">
+      <header className="navbar site-header sticky top-10 z-[50] bg-white shadow-md h-20">
         <div className="max-w-7xl mx-auto px-4 h-full flex justify-between items-center gap-4">
           <Link to="/" className="flex items-center gap-3 shrink-0">
             <div className="w-12 h-12 rounded-full flex items-center justify-center overflow-hidden border border-navy-50">
               <img src={branding.logoHeader} className="w-full h-full object-contain" alt="Logo" />
             </div>
             <div className="hidden lg:flex flex-col">
-              <span className="font-serif font-bold text-navy-900 text-lg leading-tight uppercase">{APP_CONFIG.NAME}</span>
-              <span className="text-[10px] text-navy-500 font-medium tracking-wide">{APP_CONFIG.TAGLINE}</span>
+              <span className="brand-text font-serif font-bold text-navy-900 text-lg leading-tight uppercase">{APP_CONFIG.NAME}</span>
+              <span className="brand-subtitle text-[10px] text-navy-500 font-medium tracking-wide">{APP_CONFIG.TAGLINE}</span>
             </div>
           </Link>
           <EnhancedSearchBar searchQuery={searchQuery} setSearchQuery={setSearchQuery} isSearchOpen={isSearchOpen} setIsSearchOpen={setIsSearchOpen} searchResults={searchResults} onSelect={(link) => { navigate(link); setIsSearchOpen(false); setSearchQuery(""); }} placeholder="Search resources..." />
           <div className="flex items-center gap-2 lg:gap-4 shrink-0">
             <NotificationBell unreadCount={unreadCount} onClick={() => setIsNotifOpen(true)} />
-            {isAdmin && <Link to="/admin" className="hidden lg:flex px-3 py-2 rounded-xl bg-purple-50 text-purple-700 font-black text-[10px] uppercase tracking-widest hover:bg-purple-100 transition-all items-center gap-2"><ShieldCheck size={14} /> Admin</Link>}
+            {isAdmin && <Link to="/admin" className="btn-admin hidden lg:flex items-center gap-2"><ShieldCheck size={14} /> Admin</Link>}
             <ProfileDropdown user={user} isAdmin={isAdmin} onLogout={() => setShowLogoutConfirm(true)} />
-            <button onClick={() => setIsMenuOpen(true)} className="p-2 min-h-[44px] min-w-[44px] text-navy-900 hover:text-purple-600 transition-colors flex items-center justify-center rounded-xl hover:bg-navy-50">
-              <Menu size={28} /><span className="sr-only">Menu</span>
+            <button
+              onClick={() => setIsMenuOpen(true)}
+              title="Menu"
+              className={`hamburger-btn group p-2 min-h-[44px] min-w-[44px] text-white transition-colors flex items-center justify-center rounded-xl hover:bg-white/5 ${isMenuOpen ? 'open' : ''}`}
+            >
+              <Menu size={28} className="group-hover:[stroke:url(#goldGradient)] group-[.open]:[stroke:url(#goldGradient)] transition-all duration-300" />
+              <span className="sr-only">Menu</span>
             </button>
           </div>
         </div>
       </header>
 
-      <NotificationDrawer isOpen={isNotifOpen} onClose={() => setIsNotifOpen(false)} announcements={announcements} readIds={readNotifIds} onMarkRead={(id) => { const next = [...new Set([...readNotifIds, id])]; setReadNotifIds(next); localStorage.setItem('sms_read_notifications', JSON.stringify(next)); }} onClearAll={() => { const allIds = announcements.map(a => a.id); setReadNotifIds(allIds); localStorage.setItem('sms_read_notifications', JSON.stringify(allIds)); }} />
+      <NotificationDrawer
+        isOpen={isNotifOpen}
+        onClose={() => setIsNotifOpen(false)}
+        notifications={notifications}
+        onMarkRead={handleMarkRead}
+        onClearAll={handleClearAll}
+        onEnablePush={requestPermission}
+        pushPermissionStatus={permissionStatus}
+      />
 
       <main className="flex-grow flex flex-col pb-20 lg:pb-0">
         <Suspense fallback={<PageLoader />}>
@@ -327,8 +435,14 @@ const Layout: React.FC = () => {
             <Route path="/games" element={<ProtectedRoute user={user}><GamesPage /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute user={user}><ProfilePage /></ProtectedRoute>} />
             <Route path="/journal" element={<ProtectedRoute user={user}><JournalPage /></ProtectedRoute>} />
+            <Route path="/leaderboard" element={<ProtectedRoute user={user}><LeaderboardPage /></ProtectedRoute>} />
             <Route path="/announcements" element={<AnnouncementsPage />} />
+            <Route path="/articles" element={<ArticlesPage user={user} />} />
+            <Route path="/articles/:articleId" element={<ArticlesPage user={user} />} />
             <Route path="/calendar" element={<CalendarPage />} />
+            <Route path="/events" element={<EventsPage />} />
+            <Route path="/events/:eventId" element={<EventDetailPage />} />
+            <Route path="/contact" element={<ContactPage />} />
             <Route path="/setup" element={<ProtectedRoute user={user}><SetupPage /></ProtectedRoute>} />
             <Route path="/admin" element={isAdmin ? <AdminPage user={user} /> : <Navigate to="/" />} />
             <Route path="/terms" element={<TermsOfUse />} />
@@ -337,46 +451,87 @@ const Layout: React.FC = () => {
             <Route path="/copyright" element={<Copyright />} />
             <Route path="/community-guidelines" element={<CommunityGuidelines />} />
             <Route path="/submission-guidelines" element={<ContentSubmissionGuidelines />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>
       </main>
 
       <Footer user={user} branding={branding} siteContent={siteContent} />
 
-      {isMenuOpen && (
-        <div className="fixed inset-0 z-[100] flex justify-end">
-          <div className="absolute inset-0 bg-navy-900/60 backdrop-blur-sm" onClick={() => setIsMenuOpen(false)}></div>
-          <div className="relative w-80 h-full bg-white shadow-2xl p-8 flex flex-col overflow-y-auto animate-in slide-in-from-right duration-300">
-            <button onClick={() => setIsMenuOpen(false)} className="absolute top-6 right-6 p-2 min-h-[44px] min-w-[44px] text-navy-200 hover:text-navy-900 hover:bg-neutral-100 rounded-full transition-all flex items-center justify-center"><X size={32} /></button>
-            <div className="mt-16 space-y-12 flex-grow">
-              {user?.isGuest && (
-                <div className="px-4 py-3 bg-neutral-100 rounded-2xl flex items-center gap-3 border-2 border-neutral-200">
-                  <UserCircle size={20} className="text-navy-400" />
-                  <div><p className="text-xs font-bold text-navy-900">Browsing as Guest</p><p className="text-[10px] text-navy-500"><Link to="/signup" className="text-gold-600 font-bold hover:underline" onClick={() => setIsMenuOpen(false)}>Sign up</Link> to access all</p></div>
+      <div className={`fixed inset-0 z-[100] flex justify-end transition-all ${isMenuOpen ? 'visible pointer-events-auto' : 'invisible pointer-events-none'}`}>
+        <div
+          className={`mobile-nav-overlay absolute inset-0 bg-navy-900/60 backdrop-blur-sm ${isMenuOpen ? 'open' : ''}`}
+          onClick={() => setIsMenuOpen(false)}
+        ></div>
+        <div className={`mobile-nav-drawer relative w-80 h-full bg-white shadow-2xl p-8 flex flex-col overflow-y-auto animate-in slide-in-from-right duration-300 ${isMenuOpen ? 'open' : ''}`}>
+          <button onClick={() => setIsMenuOpen(false)} className="absolute top-6 right-6 p-2 min-h-[44px] min-w-[44px] text-navy-200 hover:text-navy-900 hover:bg-neutral-100 rounded-full transition-all flex items-center justify-center"><X size={32} /></button>
+          <div className="mt-16 space-y-8 flex-grow">
+            {user && !user.isGuest ? (
+              <div className="flex items-center gap-4 px-2">
+                <Link to="/dashboard" onClick={() => setIsMenuOpen(false)} className="shrink-0 flex-shrink-0">
+                  <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-gold-500 p-0.5 bg-white">
+                    <img src={user.photoURL || APP_CONFIG.AVATAR_MALE} alt={user.name} className="w-full h-full object-cover rounded-full" />
+                  </div>
+                </Link>
+                <div className="flex flex-col justify-center h-14">
+                  <Link to="/profile" onClick={() => setIsMenuOpen(false)} className="text-sm font-bold text-navy-900 leading-tight hover:text-gold-600 transition-colors line-clamp-1">
+                    Bro/Sis {user.name}
+                  </Link>
+                  {user.centre && (
+                    <span className="text-[10px] italic text-navy-500 leading-tight line-clamp-2 mt-0.5">
+                      {user.centre}
+                    </span>
+                  )}
                 </div>
-              )}
-              <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-navy-300 mb-6 px-4">Navigation</h3>
+              </div>
+            ) : (
+              <div className="px-4 py-3 bg-neutral-100 rounded-2xl flex items-center gap-3 border-2 border-neutral-200">
+                <UserCircle size={20} className="text-navy-400" />
+                <div><p className="text-xs font-bold text-navy-900">Browsing as Guest</p><p className="text-[10px] text-navy-500"><Link to="/signup" className="text-gold-600 font-bold hover:underline" onClick={() => setIsMenuOpen(false)}>Sign up</Link> to access all</p></div>
+              </div>
+            )}
+
+            <div>
+              <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-navy-300 mb-4 px-4">Navigation</h3>
               <nav className="space-y-1">
-                <MenuLink to="/" label="Home" icon={<Home size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/'} />
+                <MenuLink to="/" label="Sai SMS Home" icon={<Home size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/'} />
+
                 {user ? (
                   <>
-                    <MenuLink to="/dashboard" label="My Dashboard" icon={<Activity size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/dashboard'} />
-                    <MenuLink to="/namasmarana" label="Mantra Tracking" icon={<Mic size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/namasmarana'} />
-                    <MenuLink to="/book-club" label="Sai Lit Club" icon={<Library size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname.startsWith('/book-club')} />
-                    <MenuLink to="/games" label="Play it" icon={<Gamepad2 size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/games'} />
-                    <MenuLink to="/journal" label="Reflections" icon={<ScrollText size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/journal'} />
-                    <MenuLink to="/profile" label="Profile" icon={<UserCircle size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/profile'} />
+                    <MenuLink to="/dashboard" label="My Sai SMS Dashboard" icon={<UserCircle size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/dashboard'} />
+                    <MenuLink to="/journal" label="My Reflections" icon={<PenTool size={16} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/journal'} isChild />
+                    <MenuLink to="/dashboard" label="My Briefcase" icon={<BookOpen size={16} />} onClick={() => setIsMenuOpen(false)} isChild />
+                    <MenuLink to="/profile" label="My Profile" icon={<UserCircle size={16} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/profile'} isChild />
+                    <MenuLink to="/leaderboard" label="Sai SMS Leaderboard" icon={<Trophy size={16} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/leaderboard'} isChild />
+
+                    <MenuLink to="/namasmarana" label="Sai SMS Mantra Count" icon={<Mic size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/namasmarana' && !location.hash.includes('likitha')} />
+                    <MenuLink to="/namasmarana#likitha" label="Sai SMS Likitha Japa" icon={<PenTool size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/namasmarana' && location.hash.includes('likitha')} />
+                    <MenuLink to="/book-club" label="Sai SMS Book Club" icon={<Library size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname.startsWith('/book-club')} />
+                    <MenuLink to="/games" label="Sai SMS Play it" icon={<Gamepad2 size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/games'} />
+                    <MenuLink to="/calendar" label="Sai SMS Calendar" icon={<Calendar size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/calendar'} />
+                    <MenuLink to="/articles" label="Sai SMS Blog" icon={<ScrollText size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname.startsWith('/articles')} />
                   </>
                 ) : (
                   <>
-                    <MenuLink to="/signin" label="Sign In" icon={<LogIn size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/signin'} />
-                    <MenuLink to="/signup" label="Sign Up" icon={<UserPlus size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/signup'} />
-                    <MenuLink to="/namasmarana" label="Mantra Tracking" icon={<Mic size={18} />} onClick={() => setIsMenuOpen(false)} isProtected isLocked />
-                    <MenuLink to="/book-club" label="Sai Lit Club" icon={<Library size={18} />} onClick={() => setIsMenuOpen(false)} isProtected isLocked />
+                    <MenuLink to="/namasmarana" label="Sai SMS Mantra Count" icon={<Mic size={18} />} onClick={() => setIsMenuOpen(false)} isProtected isLocked />
+                    <MenuLink to="/namasmarana#likitha" label="Sai SMS Likitha Japa" icon={<PenTool size={18} />} onClick={() => setIsMenuOpen(false)} isProtected isLocked />
+                    <MenuLink to="/book-club" label="Sai SMS Book Club" icon={<Library size={18} />} onClick={() => setIsMenuOpen(false)} isProtected isLocked />
+                    <MenuLink to="/games" label="Sai SMS Play it" icon={<Gamepad2 size={18} />} onClick={() => setIsMenuOpen(false)} isProtected isLocked />
+                    <MenuLink to="/calendar" label="Sai SMS Calendar" icon={<Calendar size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/calendar'} />
+                    <MenuLink to="/articles" label="Sai SMS Blog" icon={<ScrollText size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname.startsWith('/articles')} />
+
+                    <div className="pt-4 mt-4 border-t border-navy-50">
+                      <MenuLink to="/signin" label="Sign In" icon={<LogIn size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/signin'} />
+                      <MenuLink to="/signup" label="Sign Up" icon={<UserPlus size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/signup'} />
+                    </div>
                   </>
                 )}
-                {isAdmin && <MenuLink to="/admin" label="Admin Hub" icon={<Shield size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/admin'} />}
+                {isAdmin && <MenuLink to="/admin" label="Sai SMS Admin Hub" icon={<Shield size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/admin'} />}
+
+                <div className="pt-2">
+                  <MenuLink to="/about" label="About us" icon={<Info size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/about'} />
+                  <MenuLink to="/contact" label="Contact Sai SMS by SSIOM" icon={<Mail size={16} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/contact'} isChild />
+                </div>
               </nav>
             </div>
             {user && (
@@ -388,7 +543,7 @@ const Layout: React.FC = () => {
             )}
           </div>
         </div>
-      )}
+      </div>
 
       {showLogoutConfirm && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
