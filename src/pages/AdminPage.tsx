@@ -355,16 +355,18 @@ const UserRegistry = ({ adminEmail }: { adminEmail: string }) => {
                                     <button
                                        onClick={() => toggleLeaderboardVisibility(u.uid, u.publicLeaderboard)}
                                        title={u.publicLeaderboard !== false ? "Hide from Leaderboard" : "Show on Leaderboard"}
-                                       className={`p-2 rounded-lg transition-colors ${u.publicLeaderboard !== false ? 'bg-green-50 text-green-600 hover:bg-green-100' : 'bg-red-50 text-red-600 hover:bg-red-100'}`}
+                                       aria-label={u.publicLeaderboard !== false ? "Hide from Leaderboard" : "Show on Leaderboard"}
+                                       className={`p-3 rounded-lg transition-colors ${u.publicLeaderboard !== false ? 'bg-green-50 text-green-600 hover:bg-green-100' : 'bg-red-50 text-red-600 hover:bg-red-100'}`}
                                     >
-                                       {u.publicLeaderboard !== false ? <Eye size={16} /> : <EyeOff size={16} />}
+                                       {u.publicLeaderboard !== false ? <Eye size={18} /> : <EyeOff size={18} />}
                                     </button>
                                     <button
                                        onClick={() => toggleAdmin(u.uid, u.isAdmin)}
                                        title={u.isAdmin ? "Revoke Admin" : "Make Admin"}
-                                       className={`p-2 rounded-lg transition-colors ${u.isAdmin ? 'bg-orange-50 text-orange-600 hover:bg-orange-100' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}
+                                       aria-label={u.isAdmin ? "Revoke Admin" : "Make Admin"}
+                                       className={`p-3 rounded-lg transition-colors ${u.isAdmin ? 'bg-orange-50 text-orange-600 hover:bg-orange-100' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}
                                     >
-                                       {u.isAdmin ? <UserCog size={16} /> : <Shield size={16} />}
+                                       {u.isAdmin ? <UserCog size={18} /> : <Shield size={18} />}
                                     </button>
                                     <button
                                        onClick={() => deleteUser(u.uid)}
