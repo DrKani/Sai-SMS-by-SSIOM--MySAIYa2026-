@@ -1,15 +1,15 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  Library, Target,
-  Calendar,
+  Library, Calendar, Target,
   Gamepad2, ChevronRight,
   Mic, ScrollText, MessageSquare
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { BookClubWeek, SiteContent, Reflection } from '../types';
+import { BookClubWeek, SiteContent, Reflection, UserProfile } from '../types';
 import { ANNUAL_STUDY_PLAN, DEFAULT_SITE_CONTENT } from '../constants';
 import QuoteSlider from '../components/QuoteSlider';
 import SaiAvatar from '../components/SaiAvatar';
+import CollectivePrayerSection from '../components/CollectivePrayerSection';
 import { subscribeToNationalStats, NationalStats } from '../lib/nationalStats';
 import HomeLeaderboard from '../components/HomeLeaderboard';
 
@@ -33,8 +33,6 @@ const FeatureCard: React.FC<{
   </Link>
 );
 
-
-
 // ── Main Component ───────────────────────────────────────────────────────────
 
 const HomePage: React.FC = () => {
@@ -51,6 +49,13 @@ const HomePage: React.FC = () => {
       const all: Reflection[] = JSON.parse(localStorage.getItem('sms_reflections_queue') || '[]');
       return all.filter(r => r.status === 'approved').slice(0, 3);
     } catch { return []; }
+  });
+
+  const [user] = useState<UserProfile | null>(() => {
+    try {
+      const saved = localStorage.getItem('sms_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
   });
 
   // Firebase-dependent state — loaded after render, never blocks UI
@@ -195,6 +200,9 @@ const HomePage: React.FC = () => {
           btnText="View Calendar"
         />
       </div>
+
+      {/* Our Collective Prayer — National Counter + Centre Leaderboard + Personal Rank */}
+      <CollectivePrayerSection globalStats={globalStats} user={user} />
 
       {/* Our Collective Offering — Leaderboard section: always public, no auth gate */}
       <HomeLeaderboard

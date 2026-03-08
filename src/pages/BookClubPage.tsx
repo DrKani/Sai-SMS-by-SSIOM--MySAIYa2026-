@@ -282,25 +282,49 @@ const BookClubPage: React.FC = () => {
   const [studyPlan, setStudyPlan] = useState<BookClubWeek[]>(buildBaseline);
   const [isPlanLoading, setIsPlanLoading] = useState(true);
 
-  // Fetch from Firestore once; merge over the baseline
+  // Fetch from Firestore once; merge over the baseline.
+  // Uses a localStorage cache (4-hour TTL) to avoid repeated getDocs reads.
   useEffect(() => {
+    const CACHE_KEY = 'sms_bookclub_fs_cache';
+    const CACHE_TTL = 4 * 60 * 60 * 1000; // 4 hours
+
+    const applyFsMap = (fsMap: Record<string, any>) => {
+      setStudyPlan(prev => {
+        const merged = prev.map(w => {
+          const fs = fsMap[w.weekId];
+          return sanitizeWeek(fs ? { ...w, ...fs } : w);
+        });
+        Object.values(fsMap).forEach((fw: any) => {
+          if (!merged.find(w => w.weekId === fw.weekId)) merged.push(sanitizeWeek(fw));
+        });
+        return merged.sort((a, b) => a.weekId.localeCompare(b.weekId));
+      });
+    };
+
     const fetchPlan = async () => {
+      // Check cache first
+      try {
+        const raw = localStorage.getItem(CACHE_KEY);
+        if (raw) {
+          const { data, ts } = JSON.parse(raw);
+          if (Date.now() - ts < CACHE_TTL && data && Object.keys(data).length > 0) {
+            applyFsMap(data);
+            setIsPlanLoading(false);
+            return;
+          }
+        }
+      } catch { /* cache miss or corrupt — proceed to Firestore */ }
+
+      // Cache miss — fetch from Firestore
       try {
         const snap = await getDocs(collection(db, 'bookclubWeeks'));
         if (!snap.empty) {
           const fsMap: Record<string, any> = {};
           snap.docs.forEach(d => { fsMap[d.id] = d.data(); });
-          setStudyPlan(prev => {
-            const merged = prev.map(w => {
-              const fs = fsMap[w.weekId];
-              return sanitizeWeek(fs ? { ...w, ...fs } : w);
-            });
-            // Add any extra weeks created only in Firestore
-            Object.values(fsMap).forEach((fw: any) => {
-              if (!merged.find(w => w.weekId === fw.weekId)) merged.push(sanitizeWeek(fw));
-            });
-            return merged.sort((a, b) => a.weekId.localeCompare(b.weekId));
-          });
+          applyFsMap(fsMap);
+          try {
+            localStorage.setItem(CACHE_KEY, JSON.stringify({ data: fsMap, ts: Date.now() }));
+          } catch { /* storage quota — ignore */ }
         }
       } catch (err) {
         console.warn('BookClubPage: Could not fetch from Firestore, using local baseline.', err);

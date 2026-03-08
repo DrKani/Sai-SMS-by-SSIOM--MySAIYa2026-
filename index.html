@@ -9,6 +9,12 @@
   <!-- Google Site Verification -->
   <meta name="google-site-verification" content="MJcQn_TacYrWLt34BretsWMw7YsknoHYrUNWC007QAo" />
 
+  <!-- Early connection hints — shave 100-200ms per external resource -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="dns-prefetch" href="https://cdn.tailwindcss.com" />
+  <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com" />
+
   <!-- SEO Meta Tags -->
   <meta name="description"
     content="Sai SMS by SSIOM - A digital spiritual hub for SSIOM Malaysia members. Track your sadhana, join the National Book Club, and explore spiritual growth tools.">
@@ -40,10 +46,59 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Poppins:wght@300;400;500;600;700&family=Open+Sans:wght@400;600&display=swap"
     rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <!-- Font Awesome — loaded async (not needed for initial render) -->
+  <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'" />
+  <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"></noscript>
+
+  <!-- pdf.js — deferred (only needed when user opens a PDF) -->
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script>
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    document.addEventListener('DOMContentLoaded', function() {
+      if (typeof pdfjsLib !== 'undefined') {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      }
+    });
+
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            serif: ['"Playfair Display"', 'serif'],
+            sans: ['Poppins', 'sans-serif'],
+            accent: ['"Open Sans"', 'sans-serif'],
+          },
+          colors: {
+            navy: {
+              50: "#F0F4F8", 100: "#D9E2EC", 200: "#BCCCDC",
+              500: "#102A43", 600: "#243B53", 700: "#334E68", 800: "#486581",
+              900: "#002E5B"
+            },
+            purple: {
+              50: "#F5F2F7", 500: "#7B2482", 600: "#691F6E", 700: "#56195B"
+            },
+            gold: {
+              50: "#FDFBF2", 100: "#F9F4E3", 300: "#E8D6A3", 500: "#D2AC47", 700: "#937832"
+            },
+            teal: {
+              50: "#F0FDF4", 100: "#DCFCE7", 500: "#009688", 700: "#00695C"
+            },
+            magenta: {
+              50: "#FDF2F8", 500: "#C2195B", 700: "#881240"
+            },
+            neutral: {
+              0: "#FFFFFF", 50: "#FDFBF7", 100: "#F5F3E8", 400: "#CFCBBF"
+            }
+          },
+          backgroundImage: {
+            'gold-gradient': 'linear-gradient(90deg, #D2AC47 5%, #F7EF8A 45%, #AE8625 85%)',
+            'caption-overlay': 'linear-gradient(to top, rgba(0,21,71,0.9), transparent)',
+          },
+          borderRadius: {
+            'bento': '2.5rem',
+          }
+        }
+      }
+    }
   </script>
   <style>
     body {
