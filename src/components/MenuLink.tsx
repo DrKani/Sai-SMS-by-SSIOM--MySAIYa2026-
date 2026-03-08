@@ -13,47 +13,45 @@ interface MenuLinkProps {
 }
 
 const MenuLink: React.FC<MenuLinkProps> = ({ to, label, icon, onClick, isProtected = false, isLocked = false, isActive = false }) => (
-    <li>
+    <div>
         <Link
             to={to}
             onClick={onClick}
-            className={`flex items-center justify-between py-3.5 px-4 rounded-2xl group transition-all ${isActive
-                    ? 'bg-gold-50 border-2 border-gold-500'
-                    : 'hover:bg-neutral-50 border-2 border-transparent'
+            className={`flex items-center justify-between py-3.5 px-4 rounded-2xl group transition-all border-l-[3px] ${isActive
+                    ? 'border-l-[#FFD700]'
+                    : 'border-l-transparent hover:border-l-[#FFD700]'
                 }`}
+            style={isActive ? { background: 'rgba(255, 215, 0, 0.15)' } : undefined}
         >
             <div className="flex items-center gap-4">
                 {icon && (
                     <span
-                        className={`transition-colors ${isActive
-                                ? 'text-gold-600'
-                                : 'text-navy-300 group-hover:text-gold-600'
-                            }`}
+                        className="transition-colors"
+                        style={{ color: isActive ? '#FFD700' : '#E8E8E8' }}
                     >
                         {icon}
                     </span>
                 )}
                 <span
-                    className={`text-xs font-black uppercase tracking-widest transition-colors ${isActive
-                            ? 'text-gold-700'
-                            : 'text-navy-900 group-hover:text-gold-600'
-                        }`}
+                    className="text-xs font-black uppercase tracking-widest transition-colors group-hover:!text-[#FFD700]"
+                    style={{ color: isActive ? '#FFD700' : '#FFFFFF' }}
                 >
                     {label}
                 </span>
                 {isProtected && isLocked && (
-                    <Lock size={12} className="text-navy-300 ml-1" />
+                    <Lock size={12} className="text-white/30 ml-1" />
                 )}
             </div>
             <ChevronRight
                 size={14}
                 className={`transition-all ${isActive
-                        ? 'opacity-100 text-gold-600'
-                        : 'opacity-0 group-hover:opacity-100 text-gold-500'
+                        ? 'opacity-100'
+                        : 'opacity-0 group-hover:opacity-100'
                     }`}
+                style={{ color: '#FFD700' }}
             />
         </Link>
-    </li>
+    </div>
 );
 
 export default MenuLink;

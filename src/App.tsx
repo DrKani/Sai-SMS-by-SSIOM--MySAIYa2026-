@@ -100,35 +100,6 @@ const APP_TUTORIAL_STEPS: TutorialStep[] = [
   { target: 'tutorial-dashboard', title: 'My Progress', text: 'Track your personal growth and spiritual milestones here.' }
 ];
 
-const BottomNav: React.FC<{ user: UserProfile | null }> = ({ user }) => {
-  const location = useLocation();
-  const navItems = [
-    { to: '/', label: 'Home', icon: <Home size={20} /> },
-    { to: '/namasmarana', label: 'Offer', icon: <Mic size={20} /> },
-    { to: '/book-club', label: 'Lit Club', icon: <Library size={20} /> },
-    { to: user ? '/dashboard' : '/signin', label: user ? 'Stats' : 'Sign In', icon: <Activity size={20} /> },
-  ];
-
-  return (
-    <nav className="fixed bottom-0 left-0 right-0 z-[60] bg-white border-t border-navy-50 flex justify-around items-center px-2 py-3 lg:hidden shadow-[0_-5px_20px_rgba(0,0,0,0.05)]">
-      {navItems.map((item) => {
-        const isActive = location.pathname === item.to || (item.to !== '/' && location.pathname.startsWith(item.to));
-        return (
-          <Link
-            key={item.to}
-            to={item.to}
-            className={`flex flex-col items-center gap-1 transition-all ${isActive ? 'text-gold-600' : 'text-navy-300'}`}
-          >
-            <div className={`p-2 rounded-xl transition-all ${isActive ? 'bg-gold-50 shadow-sm' : ''}`}>
-              {item.icon}
-            </div>
-            <span className="text-[10px] font-black uppercase tracking-widest">{item.label}</span>
-          </Link>
-        );
-      })}
-    </nav>
-  );
-};
 
 const Layout: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -291,30 +262,38 @@ const Layout: React.FC = () => {
 
       <header className="sticky top-10 z-[50] bg-white shadow-md h-20">
         <div className="max-w-7xl mx-auto px-4 h-full flex justify-between items-center gap-4">
-          <Link to="/" className="flex items-center gap-3 shrink-0">
-            <div className="w-12 h-12 rounded-full flex items-center justify-center overflow-hidden border border-navy-50">
+          <Link to="/" className="flex items-center gap-3 shrink-0 group relative" aria-label="Go to Home">
+            <div className="w-12 h-12 rounded-full flex items-center justify-center overflow-hidden border border-navy-50 group-hover:border-gold-500 transition-colors">
               <img src={branding.logoHeader} className="w-full h-full object-contain" alt="Logo" />
             </div>
             <div className="hidden lg:flex flex-col">
               <span className="font-serif font-bold text-navy-900 text-lg leading-tight uppercase">{APP_CONFIG.NAME}</span>
               <span className="text-[10px] text-navy-500 font-medium tracking-wide">{APP_CONFIG.TAGLINE}</span>
             </div>
+            <div className="absolute left-0 top-full mt-2 bg-navy-900 text-white px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none shadow-xl z-10">
+              Go to Home
+            </div>
           </Link>
-          <EnhancedSearchBar searchQuery={searchQuery} setSearchQuery={setSearchQuery} isSearchOpen={isSearchOpen} setIsSearchOpen={setIsSearchOpen} searchResults={searchResults} onSelect={(link) => { navigate(link); setIsSearchOpen(false); setSearchQuery(""); }} placeholder="Search resources..." />
+          <EnhancedSearchBar searchQuery={searchQuery} setSearchQuery={setSearchQuery} isSearchOpen={isSearchOpen} setIsSearchOpen={setIsSearchOpen} searchResults={searchResults} onSelect={(link) => { navigate(link); setIsSearchOpen(false); setSearchQuery(""); }} placeholder="Search bhajans, articles, events..." />
           <div className="flex items-center gap-2 lg:gap-4 shrink-0">
             <NotificationBell unreadCount={unreadCount} onClick={() => setIsNotifOpen(true)} />
             {isAdmin && <Link to="/admin" className="hidden lg:flex px-3 py-2 rounded-xl bg-purple-50 text-purple-700 font-black text-[10px] uppercase tracking-widest hover:bg-purple-100 transition-all items-center gap-2"><ShieldCheck size={14} /> Admin</Link>}
             <ProfileDropdown user={user} isAdmin={isAdmin} onLogout={() => setShowLogoutConfirm(true)} />
-            <button onClick={() => setIsMenuOpen(true)} className="p-2 min-h-[44px] min-w-[44px] text-navy-900 hover:text-purple-600 transition-colors flex items-center justify-center rounded-xl hover:bg-navy-50">
-              <Menu size={28} /><span className="sr-only">Menu</span>
-            </button>
+            <div className="relative group">
+              <button onClick={() => setIsMenuOpen(true)} className="p-2 min-h-[44px] min-w-[44px] text-navy-900 hover:text-gold-600 transition-colors flex items-center justify-center rounded-xl hover:bg-navy-50" aria-label="Open menu">
+                <Menu size={28} />
+              </button>
+              <div className="absolute right-0 top-full mt-2 bg-navy-900 text-white px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none shadow-xl z-10">
+                Menu
+              </div>
+            </div>
           </div>
         </div>
       </header>
 
       <NotificationDrawer isOpen={isNotifOpen} onClose={() => setIsNotifOpen(false)} announcements={announcements} readIds={readNotifIds} onMarkRead={(id) => { const next = [...new Set([...readNotifIds, id])]; setReadNotifIds(next); localStorage.setItem('sms_read_notifications', JSON.stringify(next)); }} onClearAll={() => { const allIds = announcements.map(a => a.id); setReadNotifIds(allIds); localStorage.setItem('sms_read_notifications', JSON.stringify(allIds)); }} />
 
-      <main className="flex-grow flex flex-col pb-20 lg:pb-0">
+      <main className="flex-grow flex flex-col">
         <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/" element={<HomePage />} />
@@ -347,16 +326,26 @@ const Layout: React.FC = () => {
       {isMenuOpen && (
         <div className="fixed inset-0 z-[100] flex justify-end">
           <div className="absolute inset-0 bg-navy-900/60 backdrop-blur-sm" onClick={() => setIsMenuOpen(false)}></div>
-          <div className="relative w-80 h-full bg-white shadow-2xl p-8 flex flex-col overflow-y-auto animate-in slide-in-from-right duration-300">
-            <button onClick={() => setIsMenuOpen(false)} className="absolute top-6 right-6 p-2 min-h-[44px] min-w-[44px] text-navy-200 hover:text-navy-900 hover:bg-neutral-100 rounded-full transition-all flex items-center justify-center"><X size={32} /></button>
-            <div className="mt-16 space-y-12 flex-grow">
-              {user?.isGuest && (
-                <div className="px-4 py-3 bg-neutral-100 rounded-2xl flex items-center gap-3 border-2 border-neutral-200">
-                  <UserCircle size={20} className="text-navy-400" />
-                  <div><p className="text-xs font-bold text-navy-900">Browsing as Guest</p><p className="text-[10px] text-navy-500"><Link to="/signup" className="text-gold-600 font-bold hover:underline" onClick={() => setIsMenuOpen(false)}>Sign up</Link> to access all</p></div>
+          <div className="relative w-80 h-full shadow-2xl p-8 flex flex-col overflow-y-auto animate-in slide-in-from-right duration-300" style={{ background: 'linear-gradient(180deg, #0A2540 0%, #0D3A5F 100%)' }}>
+            <button onClick={() => setIsMenuOpen(false)} className="absolute top-6 right-6 p-2 min-h-[44px] min-w-[44px] text-white/60 hover:text-white hover:bg-white/10 rounded-full transition-all flex items-center justify-center"><X size={32} /></button>
+
+            {/* User greeting or guest indicator */}
+            <div className="mt-16 mb-8">
+              {user && !user.isGuest ? (
+                <div className="px-4 py-4">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-white/50 mb-1">Sai Ram</p>
+                  <p className="text-xl font-serif font-bold" style={{ color: '#FFD700' }}>{user.name}</p>
                 </div>
-              )}
-              <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-navy-300 mb-6 px-4">Navigation</h3>
+              ) : user?.isGuest ? (
+                <div className="px-4 py-3 bg-white/10 rounded-2xl flex items-center gap-3 border border-white/10">
+                  <UserCircle size={20} className="text-white/60" />
+                  <div><p className="text-xs font-bold text-white">Browsing as Guest</p><p className="text-[10px] text-white/50"><Link to="/signup" className="font-bold hover:underline" style={{ color: '#FFD700' }} onClick={() => setIsMenuOpen(false)}>Sign up</Link> to access all</p></div>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="flex-grow">
+              <h3 className="text-[10px] font-black uppercase tracking-[0.4em] mb-6 px-4" style={{ color: '#FFD700' }}>Navigation</h3>
               <nav className="space-y-1">
                 <MenuLink to="/" label="Home" icon={<Home size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/'} />
                 {user ? (
@@ -380,8 +369,8 @@ const Layout: React.FC = () => {
               </nav>
             </div>
             {user && (
-              <div className="mt-12 pt-6 border-t border-navy-50 shrink-0">
-                <button onClick={() => setShowLogoutConfirm(true)} className="w-full flex items-center justify-between min-h-[44px] py-3.5 px-4 rounded-2xl bg-red-50 text-red-600 hover:bg-red-100 transition-all font-black uppercase tracking-widest text-[10px]">
+              <div className="mt-12 pt-6 border-t border-white/10 shrink-0">
+                <button onClick={() => setShowLogoutConfirm(true)} className="w-full flex items-center justify-between min-h-[44px] py-3.5 px-4 rounded-2xl bg-red-500/15 text-red-400 hover:bg-red-500/25 hover:text-red-300 transition-all font-black uppercase tracking-widest text-[10px]">
                   <div className="flex items-center gap-4"><LogOut size={18} /><span>Sign Out</span></div>
                 </button>
               </div>
@@ -413,7 +402,6 @@ const Layout: React.FC = () => {
           storageKey="sms_app_onboarding"
         />
       )}
-      <BottomNav user={user} />
     </div>
   );
 };
