@@ -222,7 +222,6 @@ const DashboardPage: React.FC = () => {
   const chartData = [
     { name: 'Gayathri', value: timeframeStats.gayathri, color: '#ea7600' },
     { name: 'S.S. Gayathri', value: timeframeStats.saiGayathri, color: '#bf0449' },
-    { name: 'Mantras', value: timeframeStats.mantras, color: '#5726bf' },
     { name: 'Likitha', value: timeframeStats.likitha * 11, color: '#1d4ed8' },
   ];
 
@@ -411,57 +410,56 @@ const DashboardPage: React.FC = () => {
 
           {/* National Standing Rank Card */}
           {!user?.isGuest && userRank.loaded && (
-            <div className="bg-gold-gradient p-[1px] rounded-bento shadow-xl hover:-translate-y-1 transition-transform group">
-              <div className="bg-navy-900 rounded-[calc(24px-1px)] p-8 text-white text-center relative overflow-hidden">
-                <div className="absolute -top-10 -right-10 opacity-5 group-hover:scale-110 transition-transform duration-700">
-                  <Trophy size={150} />
-                </div>
-                <div className="relative z-10">
-                  <Trophy size={40} className="text-gold-500 mx-auto mb-4 drop-shadow-lg" />
-                  <h3 className="text-lg font-serif font-bold mb-2">National Standing</h3>
+            <div className="bg-white p-10 rounded-bento shadow-xl border border-navy-50 text-center relative overflow-hidden group">
+              <div className="absolute -top-10 -right-10 opacity-5 group-hover:scale-110 transition-transform duration-700 text-gold-500">
+                <Trophy size={150} />
+              </div>
+              <div className="relative z-10">
+                <Trophy size={40} className="text-gold-500 mx-auto mb-4 drop-shadow-lg" />
+                <h3 className="text-xl font-serif font-bold text-navy-900 mb-2">National Standing</h3>
 
-                  {userRank.rank ? (
-                    <div className="mb-6">
-                      <div className="flex items-end justify-center gap-1 mb-1">
-                        <span className="text-xl font-bold text-gold-500 pb-1">#</span>
-                        <span className="text-5xl font-black text-gold-500 leading-none">{userRank.rank}</span>
-                      </div>
-                      <p className="text-[9px] text-navy-300 font-bold uppercase tracking-widest">
-                        Out of {userRank.totalRanked} Devotees
-                      </p>
+                {userRank.rank ? (
+                  <div className="mb-6">
+                    <div className="flex items-end justify-center gap-1 mb-1">
+                      <span className="text-xl font-bold text-gold-500 pb-1">#</span>
+                      <span className="text-5xl font-black text-gold-500 leading-none">{userRank.rank}</span>
                     </div>
-                  ) : (
-                    <div className="mb-6 py-2">
-                      <p className="text-xl font-black text-white/80 mb-1">Unranked</p>
-                      <p className="text-[9px] text-navy-400 font-bold uppercase tracking-widest leading-relaxed">
-                        Top 50 Rank Required<br />Begin your Sadhana
-                      </p>
-                    </div>
-                  )}
+                    <p className="text-[9px] text-navy-400 font-bold uppercase tracking-widest">
+                      Out of {userRank.totalRanked} Devotees
+                    </p>
+                  </div>
+                ) : (
+                  <div className="mb-6 py-2">
+                    {/* CURRENT */}
+                    <p className="text-xl font-black text-navy-900 mb-1">Unranked</p>
+                    <p className="text-[9px] text-navy-400 font-bold uppercase tracking-widest leading-relaxed">
+                      Top 50 Rank Required<br />Begin your Sadhana
+                    </p>
+                  </div>
+                )}
 
-                  <Link to="/?tab=devotees" className="inline-block w-full py-3 bg-white/10 hover:bg-white/20 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors border border-white/5 shadow-inner">
-                    View Leaderboard
-                  </Link>
-                </div>
+                <Link to="/?tab=devotees" className="inline-block w-full py-3 bg-navy-50 hover:bg-navy-100 text-navy-900 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors border border-navy-100">
+                  View Leaderboard
+                </Link>
               </div>
             </div>
           )}
 
-          <div id="tutorial-dashboard" className="bg-navy-900 p-10 rounded-bento text-white shadow-2xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-10 opacity-10"><Activity size={120} /></div>
-            <h3 className="text-xl font-bold mb-6 text-gold-500">Sacred Summary {timeframe !== 'all-time' ? `(${timeframe})` : ''}</h3>
+          <div id="tutorial-dashboard" className="bg-white p-10 rounded-bento text-navy-900 shadow-xl border border-navy-50 relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-10 opacity-5 text-navy-900"><Activity size={120} /></div>
+            <h3 className="text-xl font-serif font-bold mb-6 text-navy-900">Sacred Summary {timeframe !== 'all-time' ? `(${timeframe})` : ''}</h3>
             <div className="space-y-6">
-              <Link to="/namasmarana" className="flex justify-between items-center pb-4 border-b border-white/10 group cursor-pointer hover:bg-white/5 rounded-lg p-2 transition-colors">
-                <span className="text-xs text-navy-300 font-bold uppercase group-hover:text-gold-500 transition-colors">Total Chants</span>
+              <Link to="/namasmarana" className="flex justify-between items-center pb-4 border-b border-navy-50 group cursor-pointer hover:bg-navy-50 rounded-lg p-2 transition-colors">
+                <span className="text-xs text-navy-400 font-bold uppercase group-hover:text-navy-900 transition-colors">Total Chants</span>
                 <span className="text-2xl font-black text-gold-500">{(timeframeStats.gayathri + timeframeStats.saiGayathri + (timeframeStats.likitha * 11)).toLocaleString()}</span>
               </Link>
-              <Link to="/namasmarana" className="flex justify-between items-center pb-4 border-b border-white/10 group cursor-pointer hover:bg-white/5 rounded-lg p-2 transition-colors">
-                <span className="text-xs text-navy-300 font-bold uppercase group-hover:text-gold-500 transition-colors">Japam Units</span>
-                <span className="text-2xl font-black text-white">{timeframeStats.likitha}</span>
+              <Link to="/namasmarana" className="flex justify-between items-center pb-4 border-b border-navy-50 group cursor-pointer hover:bg-navy-50 rounded-lg p-2 transition-colors">
+                <span className="text-xs text-navy-400 font-bold uppercase group-hover:text-navy-900 transition-colors">Japam Units</span>
+                <span className="text-2xl font-black text-navy-900">{timeframeStats.likitha}</span>
               </Link>
-              <Link to="/book-club" className="flex justify-between items-center group cursor-pointer hover:bg-white/5 rounded-lg p-2 transition-colors">
-                <span className="text-xs text-navy-300 font-bold uppercase group-hover:text-gold-500 transition-colors">Chapters Read</span>
-                <span className="text-2xl font-black text-white">{stats.booksRead} / 52</span>
+              <Link to="/book-club" className="flex justify-between items-center group cursor-pointer hover:bg-navy-50 rounded-lg p-2 transition-colors">
+                <span className="text-xs text-navy-400 font-bold uppercase group-hover:text-navy-900 transition-colors">Chapters Read</span>
+                <span className="text-2xl font-black text-navy-900">{stats.booksRead} / 52</span>
               </Link>
             </div>
           </div>
