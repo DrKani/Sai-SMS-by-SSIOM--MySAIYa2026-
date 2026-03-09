@@ -167,7 +167,7 @@ const UnifiedOfferingTile: React.FC<UnifiedOfferingTileProps> = ({ globalStats, 
             <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-8">
                 <div className="text-center md:text-left">
                     <h2 className="text-3xl md:text-4xl font-serif font-bold text-navy-900 mb-1">Our Collective Prayer</h2>
-                    <p className="text-navy-500 text-sm font-medium">National offering for Swami's 2026 Birthday</p>
+                    <p className="text-navy-500 text-sm font-medium">Offered with Love and Reverence to Bhagawan Sri Sathya Sai Baba</p>
                 </div>
                 <div className="bg-green-50 px-4 py-2 rounded-full border border-green-100 flex items-center gap-2 shadow-inner">
                     <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
@@ -177,30 +177,27 @@ const UnifiedOfferingTile: React.FC<UnifiedOfferingTileProps> = ({ globalStats, 
 
             <div className="grid lg:grid-cols-2 gap-8 lg:gap-12">
                 {/* LEFT COMPONENT: National Grand Total */}
-                <div className="bg-navy-900 rounded-[2rem] p-8 relative overflow-hidden flex flex-col justify-center">
-                    <div className="absolute inset-0 bg-gold-gradient opacity-10" />
-
+                <div className="bg-gradient-to-br from-gold-50 via-white to-orange-50 rounded-[2rem] p-8 border-2 border-gold-100 relative overflow-hidden flex flex-col justify-center shadow-lg">
                     <div className="relative z-10 text-center">
-                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gold-500 mb-3 block">
+                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gold-600 mb-3 block">
                             Grand Total Chants
                         </p>
                         <div className="mb-6">
                             <AnimatedNumber
                                 value={hasStats ? globalStats.totalChants : 0}
-                                className="text-5xl lg:text-7xl font-serif font-black text-white tracking-tight"
-                                style={{ textShadow: '0 4px 20px rgba(0,0,0,0.5)' }}
+                                className="text-5xl lg:text-7xl font-serif font-black text-navy-900 tracking-tight"
                             />
                         </div>
 
                         {/* Sub Metrics Row */}
                         <div className="grid grid-cols-3 gap-3 max-w-md mx-auto mb-8">
                             {(Object.keys(MANTRA_LABELS) as (keyof MantraBreakdown)[]).map(key => (
-                                <div key={key} className="bg-white/5 backdrop-blur-sm rounded-xl p-3 border border-white/10">
+                                <div key={key} className="bg-white rounded-xl p-3 border border-neutral-100 shadow-sm">
                                     <div className={`w-2 h-2 ${MANTRA_LABELS[key].color} rounded-full mx-auto mb-2`} />
-                                    <p className="text-[8px] font-black uppercase tracking-widest text-white/50 mb-1">
+                                    <p className="text-[8px] font-black uppercase tracking-widest text-navy-400 mb-1">
                                         {MANTRA_LABELS[key].label}
                                     </p>
-                                    <p className="text-lg font-black text-white">
+                                    <p className="text-lg font-black text-navy-900">
                                         {(mantras[key] || 0).toLocaleString()}
                                     </p>
                                 </div>
@@ -208,27 +205,27 @@ const UnifiedOfferingTile: React.FC<UnifiedOfferingTileProps> = ({ globalStats, 
                         </div>
 
                         {/* Stats Row & CTA */}
-                        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 border-t border-white/10">
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 border-t border-navy-100">
                             <div className="flex gap-6">
                                 <div className="text-left">
-                                    <div className="flex items-center gap-1.5 mb-1 text-gold-500">
+                                    <div className="flex items-center gap-1.5 mb-1 text-gold-600">
                                         <Users size={14} />
                                         <span className="text-[9px] font-black uppercase tracking-widest">Devotees</span>
                                     </div>
-                                    <p className="text-xl font-bold text-white">{globalStats?.totalParticipants.toLocaleString()}</p>
+                                    <p className="text-xl font-bold text-navy-900">{globalStats?.totalParticipants.toLocaleString()}</p>
                                 </div>
                                 <div className="text-left hidden sm:block">
-                                    <div className="flex items-center gap-1.5 mb-1 text-gold-500">
+                                    <div className="flex items-center gap-1.5 mb-1 text-gold-600">
                                         <Target size={14} />
                                         <span className="text-[9px] font-black uppercase tracking-widest">Goal</span>
                                     </div>
-                                    <p className="text-xl font-bold text-white">{globalStats?.goalPercent}%</p>
+                                    <p className="text-xl font-bold text-navy-900">{globalStats?.goalPercent}%</p>
                                 </div>
                             </div>
 
                             <button
                                 onClick={() => navigate('/namasmarana')}
-                                className="w-full sm:w-auto px-6 py-3 bg-gold-gradient text-navy-900 rounded-xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 hover:scale-[1.02] shadow-lg shadow-gold-500/20 transition-all"
+                                className="w-full sm:w-auto px-6 py-3 bg-navy-900 text-white rounded-xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 hover:bg-navy-800 hover:-translate-y-0.5 shadow-lg shadow-navy-900/20 transition-all"
                             >
                                 <Mic size={14} /> Offer Chants <ArrowRight size={14} />
                             </button>
@@ -249,14 +246,14 @@ const UnifiedOfferingTile: React.FC<UnifiedOfferingTileProps> = ({ globalStats, 
                     </div>
 
                     {/* Tabs */}
-                    <div className="flex gap-1 p-1 bg-white rounded-xl shadow-sm border border-navy-50 mb-4">
+                    <div className="flex gap-2 mb-4">
                         {(['centres', 'states', 'devotees'] as const).map(tab => (
                             <button
                                 key={tab}
                                 onClick={() => setActiveTab(tab)}
-                                className={`flex-1 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${activeTab === tab
-                                    ? 'bg-navy-900 text-gold-500 shadow-md'
-                                    : 'text-navy-400 hover:bg-neutral-50 hover:text-navy-600'
+                                className={`flex-1 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border-2 ${activeTab === tab
+                                    ? 'bg-gold-50 border-gold-500 text-gold-700 shadow-sm'
+                                    : 'bg-white border-neutral-100 text-navy-400 hover:bg-navy-50 hover:border-navy-200 hover:text-navy-600'
                                     }`}
                             >
                                 Top {tab}
