@@ -105,10 +105,24 @@ const HomePage: React.FC = () => {
 
       {/* Welcome Callout */}
       <section className="w-full">
-        <div className="welcome-card p-10 md:p-14 text-center">
-          <p className="text-white text-base md:text-lg lg:text-xl font-medium leading-relaxed max-w-5xl mx-auto">
+        <div className="welcome-card relative overflow-hidden p-10 md:p-14 text-center rounded-[2.5rem] bg-navy-900 border border-navy-500 shadow-2xl">
+          <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-purple-500 via-gold-500 to-orange-500 w-full"></div>
+
+          <h2 className="text-3xl md:text-5xl font-serif font-bold text-white mb-6 tracking-tight">
+            Om Sai Ram{user && !user.isGuest ? `, ${user.name.includes(' ') ? user.name.split(' ')[0] : user.name}` : ''}
+          </h2>
+
+          <p className="text-white/90 text-base md:text-lg lg:text-xl font-medium leading-relaxed max-w-5xl mx-auto">
             {siteContent.homeWelcomeText}
           </p>
+
+          {(!user || user.isGuest) && (
+            <div className="mt-8">
+              <Link to="/signup" className="inline-block px-8 py-3 bg-gold-gradient text-navy-900 rounded-full font-black uppercase tracking-widest text-xs hover:scale-105 transition-all shadow-xl shadow-gold-500/20">
+                Start Here
+              </Link>
+            </div>
+          )}
         </div>
       </section>
 

@@ -74,7 +74,7 @@ const MultiFunctionFAB: React.FC<MultiFunctionFABProps> = ({ showScrollTop, onSc
                             <Link
                                 to={action.link}
                                 onClick={() => setIsExpanded(false)}
-                                className={`w-14 h-14 ${action.color} text-white rounded-full shadow-xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all`}
+                                className={`w-14 h-14 ${action.color} text-white rounded-full shadow-xl flex items-center justify-center hover:scale-110 hover:ring-2 hover:ring-[#DAA520] hover:ring-offset-2 hover:ring-offset-white active:scale-95 transition-all`}
                                 style={{
                                     animationDelay: `${index * 50}ms`,
                                 }}

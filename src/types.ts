@@ -150,13 +150,119 @@ export interface Annotation {
 
 export interface Announcement {
   id: string;
+  // METADATA
+  createdAt?: any; // Timestamp
+  createdBy?: {
+    uid: string;
+    name: string;
+    role: string;
+  };
+  updatedAt?: any; // Timestamp
+
+  // CONTENT
   title: string;
-  content: string;
-  category: 'Event' | 'News' | 'Spiritual';
-  isPinned: boolean;
-  timestamp: string;
-  imageUrl?: string;
-  validUntil?: string;
+  message?: string;
+  content?: string; // Legacy
+  type?: 'welcome' | 'update' | 'event' | 'urgent' | 'celebration';
+  category?: 'general' | 'bookclub' | 'events' | 'technical' | 'maintenance' | 'Event' | 'News' | 'Spiritual';
+
+  // DISPLAY SETTINGS
+  displaySettings?: {
+    showInTicker: boolean;
+    showInBellNotification: boolean;
+    showInAnnouncementsPage: boolean;
+    isPinned: boolean;
+    priority: 'low' | 'normal' | 'high' | 'urgent';
+  };
+  isPinned?: boolean; // Legacy
+  timestamp?: string; // Legacy
+  imageUrl?: string; // Legacy
+  validUntil?: string; // Legacy
+
+  // TICKER CONFIGURATION
+  ticker?: {
+    enabled: boolean;
+    text: string;
+    duration: number | 'continuous';
+    startDate: any; // Timestamp
+    endDate: any; // Timestamp
+    pausable: boolean;
+    clickable: boolean;
+    clickAction?: {
+      type: 'internal' | 'external';
+      route: string;
+    };
+  };
+
+  // NOTIFICATION CONFIGURATION
+  notification?: {
+    enabled: boolean;
+    title: string;
+    body: string;
+    icon?: string;
+    badge?: string;
+    deliverTo: 'all' | 'role' | 'centre' | 'state' | 'specific_users' | 'custom';
+    targetAudience?: {
+      roles?: string[];
+      centres?: string[];
+      states?: string[];
+      userIds?: string[];
+      condition?: string;
+    };
+    sendImmediately: boolean;
+    scheduledFor?: any; // Timestamp
+    channels: {
+      inApp: boolean;
+      pushNotification: boolean;
+      email: boolean;
+      sms: boolean;
+    };
+    actions?: {
+      label: string;
+      action: string;
+      route?: string;
+      tourId?: string;
+    }[];
+  };
+
+  // LIFECYCLE
+  status?: 'draft' | 'scheduled' | 'active' | 'expired' | 'archived';
+  expiresAt?: any; // Timestamp
+  archivedAt?: any; // Timestamp
+
+  // ENGAGEMENT METRICS
+  stats?: {
+    views: number;
+    clicks: number;
+    tickerImpressions: number;
+    notificationsSent: number;
+    notificationsRead: number;
+    clickThroughRate: number;
+  };
+
+  // ATTACHMENTS (Optional)
+  attachments?: {
+    id: string;
+    type: 'image' | 'pdf' | string;
+    url: string;
+    thumbnail?: string;
+    name?: string;
+    size?: number;
+  }[];
+
+  // RICH CONTENT (Optional)
+  richContent?: {
+    html: string;
+    markdown: string;
+  };
+
+  // SEO & SEARCH
+  tags?: string[];
+  searchKeywords?: string[];
+
+  // VERSION CONTROL
+  version?: number;
+  previousVersions?: any[];
 }
 
 import { Timestamp } from 'firebase/firestore';

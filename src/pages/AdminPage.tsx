@@ -371,9 +371,10 @@ const UserRegistry = ({ adminEmail }: { adminEmail: string }) => {
                                     <button
                                        onClick={() => deleteUser(u.uid)}
                                        title="Delete User"
-                                       className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+                                       aria-label="Delete User"
+                                       className="p-3 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
                                     >
-                                       <Ban size={16} />
+                                       <Ban size={18} />
                                     </button>
                                  </div>
                               </td>
@@ -837,6 +838,7 @@ const PageContentManager = ({ adminEmail }: { adminEmail: string }) => {
 
 // 5. COMMUNICATIONS MANAGER (TICKER & ANNOUNCEMENTS)
 const CommunicationsManager = ({ adminEmail }: { adminEmail: string }) => {
+   const navigate = useNavigate();
    // Ticker State
    const [tickerMsg, setTickerMsg] = useState('');
 
@@ -952,36 +954,15 @@ const CommunicationsManager = ({ adminEmail }: { adminEmail: string }) => {
 
          {/* Announcements Module */}
          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <Card className="p-8 space-y-6">
-               <h3 className="text-lg font-bold text-navy-900 border-b border-navy-50 pb-4">Post Announcement</h3>
-               <div className="space-y-4">
-                  <input
-                     className="w-full p-3 bg-neutral-50 rounded-xl border border-navy-50 text-sm font-bold"
-                     placeholder="Headline"
-                     value={newAnn.title}
-                     onChange={e => setNewAnn({ ...newAnn, title: e.target.value })}
-                  />
-                  <div className="flex gap-2">
-                     {['News', 'Spiritual'].map(cat => (
-                        <button
-                           key={cat}
-                           onClick={() => setNewAnn({ ...newAnn, category: cat as any })}
-                           className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest border-2 transition-all ${newAnn.category === cat ? 'bg-navy-900 text-gold-500 border-navy-900' : 'bg-white border-navy-50 text-navy-300'}`}
-                        >
-                           {cat}
-                        </button>
-                     ))}
-                  </div>
-                  <textarea
-                     className="w-full p-3 bg-neutral-50 rounded-xl border border-navy-50 text-sm h-32 resize-none"
-                     placeholder="Content details..."
-                     value={newAnn.content}
-                     onChange={e => setNewAnn({ ...newAnn, content: e.target.value })}
-                  />
-                  <button onClick={postAnnouncement} className="w-full py-4 bg-navy-900 text-white font-black uppercase tracking-widest rounded-xl shadow-lg hover:bg-navy-800 transition-all flex items-center justify-center gap-2">
-                     <Megaphone size={16} /> Publish
-                  </button>
+            <Card className="p-8 flex flex-col justify-center items-center text-center">
+               <div className="w-16 h-16 bg-gold-50 text-gold-500 rounded-full flex items-center justify-center mb-6">
+                  <Megaphone size={32} />
                </div>
+               <h3 className="text-xl font-bold text-navy-900 mb-2">Create Announcement</h3>
+               <p className="text-sm text-navy-400 mb-8">Broadcast news, events, or updates to the community via banner or bell notifications.</p>
+               <button onClick={() => navigate('/admin/announcements/create')} className="w-full py-4 bg-navy-900 text-white font-black uppercase tracking-widest rounded-xl shadow-lg hover:bg-navy-800 transition-all flex items-center justify-center gap-2">
+                  <Plus size={16} /> New Announcement
+               </button>
             </Card>
 
             <Card className="lg:col-span-2 p-8 overflow-hidden flex flex-col">
@@ -1001,8 +982,13 @@ const CommunicationsManager = ({ adminEmail }: { adminEmail: string }) => {
                            <h4 className="font-bold text-navy-900">{a.title}</h4>
                            <p className="text-xs text-navy-500 line-clamp-1">{a.content}</p>
                         </div>
-                        <button onClick={() => deleteAnnouncement(a.id)} className="p-2 text-red-200 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all">
-                           <Trash2 size={16} />
+                        <button
+                           onClick={() => deleteAnnouncement(a.id)}
+                           title="Delete Announcement"
+                           aria-label="Delete Announcement"
+                           className="p-3 text-red-200 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                        >
+                           <Trash2 size={18} />
                         </button>
                      </div>
                   ))}
@@ -2252,18 +2238,19 @@ const ArticleManager = ({ adminEmail, user }: { adminEmail: string; user: UserPr
                            <td className="p-5 text-[10px] text-navy-400">{new Date(a.updatedAt).toLocaleDateString()}</td>
                            <td className="p-5 text-right">
                               <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                 <button onClick={() => openEdit(a)} title="Edit" className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100">
-                                    <Edit3 size={15} />
+                                 <button onClick={() => openEdit(a)} title="Edit" aria-label="Edit Article" className="p-3 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100">
+                                    <Edit3 size={18} />
                                  </button>
                                  <button
                                     onClick={() => togglePublish(a)}
                                     title={a.status === 'published' ? 'Unpublish' : 'Publish'}
-                                    className={`p-2 rounded-lg ${a.status === 'published' ? 'bg-orange-50 text-orange-600 hover:bg-orange-100' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}
+                                    aria-label={a.status === 'published' ? 'Unpublish' : 'Publish'}
+                                    className={`p-3 rounded-lg ${a.status === 'published' ? 'bg-orange-50 text-orange-600 hover:bg-orange-100' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}
                                  >
-                                    <GlobeIcon size={15} />
+                                    <GlobeIcon size={18} />
                                  </button>
-                                 <button onClick={() => deleteArticle(a)} title="Delete" className="p-2 bg-red-50 text-red-500 rounded-lg hover:bg-red-100">
-                                    <Trash2 size={15} />
+                                 <button onClick={() => deleteArticle(a)} title="Delete" aria-label="Delete Article" className="p-3 bg-red-50 text-red-500 rounded-lg hover:bg-red-100">
+                                    <Trash2 size={18} />
                                  </button>
                               </div>
                            </td>

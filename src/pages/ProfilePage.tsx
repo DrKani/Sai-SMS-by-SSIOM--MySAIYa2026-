@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Shield, Award, Calendar, ChevronRight, Settings, CheckCircle2, BookOpen, CalendarDays } from 'lucide-react';
-import { AreaChart, Area, ResponsiveContainer, XAxis, Tooltip } from 'recharts';
+import { AreaChart, Area, ResponsiveContainer, XAxis, Tooltip as RechartsTooltip } from 'recharts';
 import { UserProfile } from '../types';
 import SaiAvatar from '../components/SaiAvatar';
 import ProfileSettingsModal from '../components/ProfileSettingsModal';
+import QuoteSlider from '../components/QuoteSlider';
 
 const ProfilePage: React.FC = () => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [stats, setStats] = useState({ gayathri: 0, saiGayathri: 0, likitha: 0 });
   const [completions, setCompletions] = useState<string[]>([]);
+  const [savedQuotes, setSavedQuotes] = useState<string[]>([]);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const [badges, setBadges] = useState<{ badgeId: string, unlockedAt: any }[]>([]);
@@ -34,11 +36,21 @@ const ProfilePage: React.FC = () => {
         setCompletions(userCompletions);
 
         // Fetch Badges
-        const { getDocs, collection } = await import('firebase/firestore');
+        const { getDocs, collection, doc, getDoc } = await import('firebase/firestore');
         const { db } = await import('../lib/firebase');
         const badgesSnap = await getDocs(collection(db, 'users', userData.uid, 'badges'));
         const earnedBadges = badgesSnap.docs.map(doc => doc.data() as { badgeId: string, unlockedAt: any });
         setBadges(earnedBadges);
+
+        // Fetch Saved Quotes
+        const userDocRef = doc(db, 'users', userData.uid);
+        const userDocSnap = await getDoc(userDocRef);
+        if (userDocSnap.exists()) {
+          const data = userDocSnap.data();
+          if (data.savedQuotes && Array.isArray(data.savedQuotes)) {
+            setSavedQuotes(data.savedQuotes);
+          }
+        }
       }
     }
   };
@@ -111,7 +123,7 @@ const ProfilePage: React.FC = () => {
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={chartData}>
                   <XAxis dataKey="month" hide />
-                  <Tooltip
+                  <RechartsTooltip
                     contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
                     labelStyle={{ fontWeight: 'bold' }}
                   />
@@ -327,6 +339,26 @@ const ProfilePage: React.FC = () => {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Saved Quotes Section */}
+      {savedQuotes.length > 0 && (
+        <div className="mt-12 bg-white p-10 rounded-bento shadow-xl border border-navy-50">
+          <h3 className="font-serif text-2xl font-bold text-navy-900 mb-6">My Favourite Sai Quotes</h3>
+          {savedQuotes.length > 5 ? (
+            <QuoteSlider quotes={savedQuotes} title={`${savedQuotes.length} Saved Favourites`} />
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {savedQuotes.map((quote, idx) => (
+                <div key={idx} className="p-8 rounded-3xl bg-neutral-50 border border-navy-50 shadow-sm relative overflow-hidden group">
+                  <div className="absolute -right-4 -top-8 text-9xl text-navy-900/5 font-serif font-black pointer-events-none">"</div>
+                  <p className="text-navy-900 italic font-serif leading-relaxed relative z-10">"{quote}"</p>
+                  <p className="text-xs text-navy-400 font-bold uppercase tracking-widest mt-6 relative z-10">– Sathya Sai Baba</p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
