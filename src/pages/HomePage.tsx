@@ -9,9 +9,8 @@ import { BookClubWeek, SiteContent, Reflection, UserProfile } from '../types';
 import { ANNUAL_STUDY_PLAN, DEFAULT_SITE_CONTENT } from '../constants';
 import QuoteSlider from '../components/QuoteSlider';
 import SaiAvatar from '../components/SaiAvatar';
-import CollectivePrayerSection from '../components/CollectivePrayerSection';
+import UnifiedOfferingTile from '../components/UnifiedOfferingTile';
 import { subscribeToNationalStats, NationalStats } from '../lib/nationalStats';
-import HomeLeaderboard from '../components/HomeLeaderboard';
 
 const FeatureCard: React.FC<{
   to: string; icon: React.ReactNode; label: string; title: string; description: string; cardClass: string; btnText: string;
@@ -215,14 +214,8 @@ const HomePage: React.FC = () => {
         />
       </div>
 
-      {/* Our Collective Prayer — National Counter + Centre Leaderboard + Personal Rank */}
-      <CollectivePrayerSection globalStats={globalStats} user={user} />
-
-      {/* Our Collective Offering — Leaderboard section: always public, no auth gate */}
-      <HomeLeaderboard
-        globalTotalChants={globalStats?.totalChants || 0}
-        globalTotalParticipants={globalStats?.totalParticipants || 0}
-      />
+      {/* Unified Offering Tile */}
+      <UnifiedOfferingTile globalStats={globalStats} user={user} />
 
       {/* Devotee Reflections */}
       {approvedReflections.length > 0 && (
