@@ -237,7 +237,7 @@ const UnifiedOfferingTile: React.FC<UnifiedOfferingTileProps> = ({ globalStats, 
                 </div>
 
                 {/* RIGHT COMPONENT: Who Contributed (Compact Leaderboard) */}
-                <div className="bg-neutral-50 rounded-[2rem] p-6 border border-navy-50 flex flex-col">
+                <div className="bg-white rounded-[2rem] p-6 border-2 border-navy-100 flex flex-col shadow-lg">
                     <div className="flex items-center justify-between mb-6">
                         <h3 className="text-lg font-serif font-bold text-navy-900 flex items-center gap-2">
                             <Trophy size={18} className="text-gold-500" />
@@ -280,28 +280,28 @@ const UnifiedOfferingTile: React.FC<UnifiedOfferingTileProps> = ({ globalStats, 
                                 return (
                                     <div
                                         key={entry.id}
-                                        className={`flex items-center gap-3 p-3 rounded-xl bg-white border transition-all hover:shadow-md ${isCurrentUser ? 'border-blue-200 ring-1 ring-blue-100 bg-blue-50/30' : 'border-neutral-100'
+                                        className={`flex items-center gap-3 p-3 rounded-xl bg-white border-2 transition-all hover:shadow-md hover:-translate-y-0.5 ${isCurrentUser ? 'border-navy-500 ring-2 ring-navy-200 bg-navy-50/50' : 'border-neutral-100'
                                             }`}
                                     >
                                         <RankBadge rank={entry.rank} />
                                         <div className="flex-grow min-w-0">
                                             <div className="flex items-center gap-2">
-                                                <p className={`text-sm truncate font-medium ${entry.rank === 1 ? 'text-gold-600 font-bold' : 'text-navy-900'}`}>
+                                                <p className={`text-sm truncate font-bold ${entry.rank === 1 ? 'text-gold-700' : 'text-navy-900'}`}>
                                                     {entry.name}
                                                 </p>
                                                 {isCurrentUser && (
-                                                    <span className="text-[8px] bg-blue-100 text-blue-600 font-bold px-1.5 py-0.5 rounded-md uppercase">
+                                                    <span className="text-[9px] bg-navy-900 text-gold-500 font-black px-2 py-0.5 rounded-md uppercase tracking-widest">
                                                         You
                                                     </span>
                                                 )}
                                             </div>
-                                            <p className="text-[9px] font-black uppercase tracking-widest text-navy-400 truncate">
+                                            <p className="text-[10px] font-bold uppercase tracking-widest text-navy-500 truncate">
                                                 {entry.sub}
                                             </p>
                                         </div>
-                                        <div className="text-right shrink-0">
+                                        <div className="text-right shrink-0 bg-neutral-50 px-3 py-1.5 rounded-lg border border-neutral-200">
                                             <p className="text-sm font-black text-navy-900">{entry.count.toLocaleString()}</p>
-                                            <p className="text-[8px] uppercase tracking-widest text-navy-300">Chants</p>
+                                            <p className="text-[8px] font-black uppercase tracking-widest text-navy-400">Chants</p>
                                         </div>
                                     </div>
                                 );

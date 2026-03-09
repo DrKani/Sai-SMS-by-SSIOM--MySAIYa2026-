@@ -14,13 +14,13 @@ interface MenuLinkProps {
 }
 
 const MenuLink: React.FC<MenuLinkProps> = ({ to, label, icon, onClick, isProtected = false, isLocked = false, isActive = false, isChild = false }) => (
-    <li>
+    <li className="list-none">
         <Link
             to={to}
             onClick={onClick}
-            className={`flex items-center justify-between py-3 px-4 rounded-2xl group transition-all ${isChild ? 'ml-6 py-2.5 mt-1' : 'mt-1.5'} ${isActive
-                ? 'bg-gold-50 border-2 border-gold-500'
-                : 'hover:bg-neutral-50 border-2 border-transparent'
+            className={`flex items-center justify-between py-3 px-4 rounded-2xl group transition-all duration-300 ${isChild ? 'ml-6 py-2.5 mt-1' : 'mt-1.5'} ${isActive
+                ? 'bg-gold-50 border-2 border-gold-500 shadow-sm'
+                : 'hover:bg-navy-50 border-2 border-transparent hover:scale-[1.02] hover:shadow-sm'
                 }`}
         >
             <div className="flex items-center gap-3">

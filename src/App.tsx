@@ -481,9 +481,9 @@ const Layout: React.FC = () => {
                   </div>
                 </Link>
                 <div className="flex flex-col justify-center h-14 min-w-0">
-                  <Tooltip content={<>Bro/Sis {user.name}</>}>
+                  <Tooltip content={<>{user.gender === 'female' ? 'Sis' : 'Bro'} {user.name}</>}>
                     <Link to="/profile" onClick={() => setIsMenuOpen(false)} className="text-sm font-bold text-navy-900 leading-tight hover:text-gold-600 transition-colors block truncate w-full" style={{ whiteSpace: user.name && !user.name.includes(' ') && user.name.length > 20 ? 'normal' : 'nowrap', overflowWrap: 'break-word' }}>
-                      Bro/Sis {user.name.includes(' ') ? user.name.split(' ')[0] : user.name}
+                      {user.gender === 'female' ? 'Sis' : 'Bro'} {user.name.includes(' ') ? user.name.split(' ')[0] : user.name}
                     </Link>
                   </Tooltip>
                   {user.centre && (
@@ -504,7 +504,7 @@ const Layout: React.FC = () => {
 
             <div>
               <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-navy-300 mb-4 px-4">Navigation</h3>
-              <nav className="space-y-1">
+              <ul className="space-y-1 list-none p-0 m-0 w-full">
                 <MenuLink to="/" label="Sai SMS Home" icon={<Home size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/'} />
 
                 {user ? (
@@ -543,7 +543,7 @@ const Layout: React.FC = () => {
                   <MenuLink to="/about" label="About us" icon={<Info size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/about'} />
                   <MenuLink to="/contact" label="Contact Sai SMS by SSIOM" icon={<Mail size={16} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/contact'} isChild />
                 </div>
-              </nav>
+              </ul>
             </div>
             {user && (
               <div className="mt-12 pt-6 border-t border-navy-50 shrink-0">
