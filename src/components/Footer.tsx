@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { UserProfile, BrandingConfig, SiteContent } from '../types';
 import { APP_CONFIG } from '../constants';
+import Tooltip from './Tooltip';
 
 interface FooterProps {
     user: UserProfile | null;
@@ -92,52 +93,93 @@ const Footer: React.FC<FooterProps> = ({ user, branding, siteContent }) => {
                         <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
                             {/* Home */}
                             <li>
-                                <Link to="/" title="Go to the Sai SMS Home page" aria-label="Go to the Sai SMS Home page" style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.7)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e => (e.currentTarget.style.color = '#F5D78E')} onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.7)')}>Home</Link>
+                                <Tooltip content="Go to the Sai SMS Home page">
+<Link to="/"  aria-label="Go to the Sai SMS Home page" style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.7)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e =>
+ (e.currentTarget.style.color = '#F5D78E')} onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.7)')}>Home
+</Link>
+</Tooltip>
                             </li>
                             {/* Sai SMS Dash — conditional tooltip based on auth */}
                             <li>
                                 {isGuest ? (
-                                    <span title="Sign in to access your Personal Sai SMS Dashboard" aria-label="Sign in to access your Personal Sai SMS Dashboard" aria-disabled="true" style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.28)', cursor: 'not-allowed' }}>Sai SMS Dash</span>
+                                    <Tooltip content="Sign in to access your Personal Sai SMS Dashboard">
+<span  aria-label="Sign in to access your Personal Sai SMS Dashboard" aria-disabled="true" style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.28)', cursor: 'not-allowed' }}>
+Sai SMS Dash
+</span>
+</Tooltip>
                                 ) : (
-                                    <Link to="/dashboard" title="Go to your Personal Sai SMS Dashboard" aria-label="Go to your Personal Sai SMS Dashboard" style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.7)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e => (e.currentTarget.style.color = '#F5D78E')} onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.7)')}>Sai SMS Dash</Link>
+                                    <Tooltip content="Go to your Personal Sai SMS Dashboard">
+<Link to="/dashboard"  aria-label="Go to your Personal Sai SMS Dashboard" style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.7)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e =>
+ (e.currentTarget.style.color = '#F5D78E')} onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.7)')}>Sai SMS Dash
+</Link>
+</Tooltip>
                                 )}
                             </li>
                             {/* Sai SMS Chants */}
                             <li>
-                                <Link to="/namasmarana" title="Submit your daily Mantra Count and Likitha Japam" aria-label="Submit your daily Mantra Count and Likitha Japam" style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.7)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e => (e.currentTarget.style.color = '#F5D78E')} onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.7)')}>Sai SMS Chants</Link>
+                                <Tooltip content="Submit your daily Mantra Count and Likitha Japam">
+<Link to="/namasmarana"  aria-label="Submit your daily Mantra Count and Likitha Japam" style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.7)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e =>
+ (e.currentTarget.style.color = '#F5D78E')} onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.7)')}>Sai SMS Chants
+</Link>
+</Tooltip>
                             </li>
                             {/* Sai SMS Book Club */}
                             <li>
-                                <Link to="/book-club" title="Explore our curated Sai SMS reading community" aria-label="Explore our curated Sai SMS reading community" style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.7)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e => (e.currentTarget.style.color = '#F5D78E')} onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.7)')}>Sai SMS Book Club</Link>
+                                <Tooltip content="Explore our curated Sai SMS reading community">
+<Link to="/book-club"  aria-label="Explore our curated Sai SMS reading community" style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.7)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e =>
+ (e.currentTarget.style.color = '#F5D78E')} onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.7)')}>Sai SMS Book Club
+</Link>
+</Tooltip>
                             </li>
                             {/* Sai SMS Events */}
                             <li>
-                                <Link to="/calendar" title="Browse upcoming SSIOM spiritual events" aria-label="Browse upcoming SSIOM spiritual events" style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.7)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e => (e.currentTarget.style.color = '#F5D78E')} onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.7)')}>Sai SMS Events</Link>
+                                <Tooltip content="Browse upcoming SSIOM spiritual events">
+<Link to="/calendar"  aria-label="Browse upcoming SSIOM spiritual events" style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.7)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e =>
+ (e.currentTarget.style.color = '#F5D78E')} onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.7)')}>Sai SMS Events
+</Link>
+</Tooltip>
                             </li>
                             {/* Sai SMS Games */}
                             <li>
-                                <Link to="/games" title="Explore spiritually enriching games and quizzes" aria-label="Explore spiritually enriching games and quizzes" style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.7)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e => (e.currentTarget.style.color = '#F5D78E')} onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.7)')}>Sai SMS Games</Link>
+                                <Tooltip content="Explore spiritually enriching games and quizzes">
+<Link to="/games"  aria-label="Explore spiritually enriching games and quizzes" style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.7)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e =>
+ (e.currentTarget.style.color = '#F5D78E')} onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.7)')}>Sai SMS Games
+</Link>
+</Tooltip>
                             </li>
                             {/* Sai SMS Briefcase — conditional tooltip based on auth */}
                             <li>
                                 {isGuest ? (
-                                    <span title="Sign in to access your personal Sai SMS Briefcase" aria-label="Sign in to access your personal Sai SMS Briefcase" aria-disabled="true" style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.28)', cursor: 'not-allowed' }}>Sai SMS Briefcase</span>
+                                    <Tooltip content="Sign in to access your personal Sai SMS Briefcase">
+<span  aria-label="Sign in to access your personal Sai SMS Briefcase" aria-disabled="true" style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.28)', cursor: 'not-allowed' }}>
+Sai SMS Briefcase
+</span>
+</Tooltip>
                                 ) : (
-                                    <Link to="/briefcase" title="Go to your personal Sai SMS Briefcase" aria-label="Go to your personal Sai SMS Briefcase" style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.7)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e => (e.currentTarget.style.color = '#F5D78E')} onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.7)')}>Sai SMS Briefcase</Link>
+                                    <Tooltip content="Go to your personal Sai SMS Briefcase">
+<Link to="/briefcase"  aria-label="Go to your personal Sai SMS Briefcase" style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.7)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e =>
+ (e.currentTarget.style.color = '#F5D78E')} onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.7)')}>Sai SMS Briefcase
+</Link>
+</Tooltip>
                                 )}
                             </li>
                             {/* Sai SMS Admin */}
                             <li>
-                                <Link to="/admin" title="Access the Sai SMS Admin Dashboard" aria-label="Access the Sai SMS Admin Dashboard" style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.7)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e => (e.currentTarget.style.color = '#F5D78E')} onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.7)')}>Sai SMS Admin</Link>
+                                <Tooltip content="Access the Sai SMS Admin Dashboard">
+<Link to="/admin"  aria-label="Access the Sai SMS Admin Dashboard" style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.7)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e =>
+ (e.currentTarget.style.color = '#F5D78E')} onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.7)')}>Sai SMS Admin
+</Link>
+</Tooltip>
                             </li>
                         </ul>
 
                         {/* CTA Buttons — only for guests */}
                         {isGuest && (
                             <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.25rem', flexWrap: 'wrap' }}>
-                                <Link
+                                <Tooltip content="Create your free Sai SMS account">
+<Link
                                     to="/signup"
-                                    title="Create your free Sai SMS account"
+                                    
                                     aria-label="Create your free Sai SMS account"
                                     style={{
                                         padding: '0.5rem 1.25rem',
@@ -156,14 +198,18 @@ const Footer: React.FC<FooterProps> = ({ user, branding, siteContent }) => {
                                         lineHeight: 1,
                                         transition: 'opacity 0.2s',
                                     }}
-                                    onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
+                                    onMouseEnter={e =>
+ (e.currentTarget.style.opacity = '0.85')}
                                     onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
                                 >
                                     Sign Up
-                                </Link>
-                                <Link
+                                
+</Link>
+</Tooltip>
+                                <Tooltip content="Sign in to your existing Sai SMS account">
+<Link
                                     to="/signin"
-                                    title="Sign in to your existing Sai SMS account"
+                                    
                                     aria-label="Sign in to your existing Sai SMS account"
                                     style={{
                                         padding: '0.5rem 1.25rem',
@@ -182,11 +228,14 @@ const Footer: React.FC<FooterProps> = ({ user, branding, siteContent }) => {
                                         lineHeight: 1,
                                         transition: 'background 0.2s, color 0.2s',
                                     }}
-                                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(201,168,76,0.15)'; }}
+                                    onMouseEnter={e =>
+ { e.currentTarget.style.background = 'rgba(201,168,76,0.15)'; }}
                                     onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
                                 >
                                     Sign In
-                                </Link>
+                                
+</Link>
+</Tooltip>
                             </div>
                         )}
                     </div>
@@ -198,42 +247,62 @@ const Footer: React.FC<FooterProps> = ({ user, branding, siteContent }) => {
                             <li>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
                                     <MapPin size={17} className="footer-icon" style={{ flexShrink: 0 }} />
-                                    <a
+                                    <Tooltip content="Click to view our location on Google Map">
+<a
                                         href="https://www.google.com/maps/search/?api=1&query=Unit+B-3-20+Pusat+Perdagangan+Sek+8+Jalan+Sg+Jernih+8%2F1+46050+Petaling+Jaya+Selangor+Malaysia"
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        title="Click to view our location on Google Map"
+                                        
                                         aria-label="Click to view our location on Google Map"
                                         style={{ fontSize: '0.8rem', fontWeight: 700, color: 'white', textDecoration: 'none', transition: 'text-decoration 0.2s' }}
-                                        onMouseEnter={e => (e.currentTarget.style.textDecoration = 'underline')}
+                                        onMouseEnter={e =>
+ (e.currentTarget.style.textDecoration = 'underline')}
                                         onMouseLeave={e => (e.currentTarget.style.textDecoration = 'none')}
                                     >
                                         Pertubuhan Sathya Sai Malaysia [PPM-001-14-10081983]
-                                    </a>
+                                    
+</a>
+</Tooltip>
                                 </div>
                             </li>
                             {/* Website + Phone on the same row */}
                             <li style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-start' }}>
-                                <a href="https://ssiomalaysia.org.my/Home" target="_blank" rel="noopener noreferrer" title="Visit the official SSIOM website" aria-label="Visit the official SSIOM website" className="footer-contact-link" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', textDecoration: 'none' }}>
+                                <Tooltip content="Visit the official SSIOM website">
+<a href="https://ssiomalaysia.org.my/Home" target="_blank" rel="noopener noreferrer"  aria-label="Visit the official SSIOM website" className="footer-contact-link" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', textDecoration: 'none' }}>
+
                                     <Globe size={17} className="footer-icon" style={{ flexShrink: 0 }} />
                                     <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.7)' }}>ssiomalaysia.org.my</span>
-                                </a>
-                                <a href="tel:+60374993159" title="Click to call SSIOM office" aria-label="Click to call SSIOM office" className="footer-contact-link" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', textDecoration: 'none' }}>
+                                
+</a>
+</Tooltip>
+                                <Tooltip content="Click to call SSIOM office">
+<a href="tel:+60374993159"  aria-label="Click to call SSIOM office" className="footer-contact-link" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', textDecoration: 'none' }}>
+
                                     <Phone size={17} className="footer-icon" style={{ flexShrink: 0 }} />
                                     <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.7)' }}>+603-7499 3159</span>
-                                </a>
+                                
+</a>
+</Tooltip>
                             </li>
                             <li style={{ display: 'flex', justifyContent: 'flex-start' }}>
-                                <a href="https://wa.me/60126663284?text=OmSaiRam" target="_blank" rel="noopener noreferrer" title="Click to open WhatsApp chat with SSIOM" aria-label="Click to open WhatsApp chat with SSIOM" className="footer-contact-link" style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', textDecoration: 'none' }}>
+                                <Tooltip content="Click to open WhatsApp chat with SSIOM">
+<a href="https://wa.me/60126663284?text=OmSaiRam" target="_blank" rel="noopener noreferrer"  aria-label="Click to open WhatsApp chat with SSIOM" className="footer-contact-link" style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', textDecoration: 'none' }}>
+
                                     <MessageCircle size={17} className="footer-icon" style={{ flexShrink: 0 }} />
                                     <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.7)' }}>+6012-666 3284 [WhatsApp]</span>
-                                </a>
+                                
+</a>
+</Tooltip>
                             </li>
                             <li style={{ display: 'flex', justifyContent: 'flex-start' }}>
-                                <a href="mailto:ssio.malaysia@gmail.com" title="Click to send an email to SSIOM" aria-label="Click to send an email to SSIOM" className="footer-contact-link" style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', textDecoration: 'none' }}>
+                                <Tooltip content="Click to send an email to SSIOM">
+<a href="mailto:ssio.malaysia@gmail.com"  aria-label="Click to send an email to SSIOM" className="footer-contact-link" style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', textDecoration: 'none' }}>
+
                                     <Mail size={17} className="footer-icon" style={{ flexShrink: 0 }} />
                                     <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.7)' }}>ssio.malaysia@gmail.com</span>
-                                </a>
+                                
+</a>
+</Tooltip>
                             </li>
                         </ul>
 
@@ -286,9 +355,13 @@ const Footer: React.FC<FooterProps> = ({ user, branding, siteContent }) => {
 
                 {/* ═══ ROW 2: Copyright + Legal Links — stacked vertically, left aligned ═══ */}
                 <div className="footer-row2-bar">
-                    <p title="Om Sri Sai Ram" style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.4)', margin: 0, whiteSpace: 'nowrap' }}>
+                    <Tooltip content="Om Sri Sai Ram">
+<p  style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.4)', margin: 0, whiteSpace: 'nowrap' }}>
+
                         © {new Date().getFullYear()} SSIOM Malaysia. All Rights Reserved.
-                    </p>
+                    
+</p>
+</Tooltip>
                     <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.35rem 0.45rem' }}>
                         {legalLinks.map((link, i) => (
                             <React.Fragment key={link.to}>
@@ -315,11 +388,15 @@ const Footer: React.FC<FooterProps> = ({ user, branding, siteContent }) => {
 
                 {/* ═══ ROW 3: Full-width Dedication Statement ═══ */}
                 <div style={{ textAlign: 'center' }}>
-                    <p title="Om Sri Sai Ram" aria-label="Om Sri Sai Ram" style={{ fontSize: '0.8rem', fontStyle: 'italic', color: 'rgba(255,255,255,0.5)', margin: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.625rem', flexWrap: 'wrap' }}>
+                    <Tooltip content="Om Sri Sai Ram">
+<p  aria-label="Om Sri Sai Ram" style={{ fontSize: '0.8rem', fontStyle: 'italic', color: 'rgba(255,255,255,0.5)', margin: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.625rem', flexWrap: 'wrap' }}>
+
                         <span title="Om Sri Sai Ram" aria-label="Om Sri Sai Ram"><LotusIcon size={18} /></span>
                         <span>Offered with Love and Gratitude to the Divine Lotus Feet of Bhagawan Sri Sathya Sai Baba.</span>
                         <span title="Om Sri Sai Ram" aria-label="Om Sri Sai Ram"><LotusIcon size={18} /></span>
-                    </p>
+                    
+</p>
+</Tooltip>
                 </div>
 
             </div>

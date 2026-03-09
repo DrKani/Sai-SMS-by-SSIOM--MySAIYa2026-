@@ -1,6 +1,8 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { ChevronLeft, ChevronRight, Heart } from 'lucide-react';
 import { QUOTES_LIST as QUOTES } from '../constants';
+import { db } from '../lib/firebase';
+import { doc, updateDoc, arrayUnion, getDoc } from 'firebase/firestore';
 
 const GRADIENTS = [
   'linear-gradient(135deg, #22c55e, #15803d)',
@@ -16,59 +18,133 @@ const GRADIENTS = [
   'linear-gradient(135deg, #d946ef, #a21caf)'
 ];
 
-const QuoteSlider: React.FC = () => {
-  // Initialize with a random index for both quote and color
-  const [index, setIndex] = useState(() => Math.floor(Math.random() * QUOTES.length));
+interface QuoteSliderProps {
+  quotes?: string[]; // Optional override for displaying specific quotes
+  title?: string;
+}
+
+const QuoteSlider: React.FC<QuoteSliderProps> = ({ quotes = QUOTES, title }) => {
+  const [index, setIndex] = useState(() => Math.floor(Math.random() * quotes.length));
   const [colorIndex, setColorIndex] = useState(() => Math.floor(Math.random() * GRADIENTS.length));
   const [fade, setFade] = useState(true);
+  const [isSaved, setIsSaved] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Function to get a random index that is different from the current one
-  const getRandomIndex = (currentIndex: number) => {
-    if (QUOTES.length <= 1) return 0;
-    let nextIndex;
-    do {
-      nextIndex = Math.floor(Math.random() * QUOTES.length);
-    } while (nextIndex === currentIndex);
-    return nextIndex;
-  };
-
-  const getRandomColorIndex = (currentIndex: number) => {
-    if (GRADIENTS.length <= 1) return 0;
-    let nextIndex;
-    do {
-      nextIndex = Math.floor(Math.random() * GRADIENTS.length);
-    } while (nextIndex === currentIndex);
-    return nextIndex;
-  };
+  const startTimer = useCallback(() => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
+      handleNext();
+    }, 8000); // 8 seconds per quote
+  }, [quotes.length]);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setFade(false); // Start fade out
+    startTimer();
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [startTimer]);
 
-      // Wait for fade out to complete before changing text/color
-      setTimeout(() => {
-        setIndex((prevIndex) => getRandomIndex(prevIndex));
-        setColorIndex((prevColorIndex) => getRandomColorIndex(prevColorIndex));
-        setFade(true); // Start fade in
-      }, 500); // 0.5s fade duration matches CSS transition
+  const changeSlide = (newIndex: number) => {
+    setFade(false); // Start fade out
+    setTimeout(() => {
+      setIndex(newIndex);
+      setColorIndex((c) => (c + 1) % GRADIENTS.length);
+      setIsSaved(false); // reset saved status visually
+      setFade(true); // Start fade in
+      startTimer(); // reset interval
+    }, 300); // Quick fade duration
+  };
 
-    }, 8000); // 8 seconds per quote
+  const handleNext = () => {
+    changeSlide((index + 1) % quotes.length);
+  };
 
-    return () => clearInterval(interval);
-  }, []);
+  const handlePrev = () => {
+    changeSlide((index - 1 + quotes.length) % quotes.length);
+  };
+
+  const handleDotClick = (dotIndex: number) => {
+    if (dotIndex !== index) {
+      changeSlide(dotIndex);
+    }
+  };
+
+  const handleSaveQuote = async () => {
+    if (isSaving || isSaved) return;
+    try {
+      setIsSaving(true);
+      const savedUserStr = localStorage.getItem('sms_user');
+      if (!savedUserStr) return;
+
+      const user = JSON.parse(savedUserStr);
+      if (user.isGuest || !user.uid) return;
+
+      const quoteText = quotes[index];
+      const userRef = doc(db, 'users', user.uid);
+
+      // We don't want to error if the user document is missing the array, arrayUnion handles creating it.
+      await updateDoc(userRef, {
+        savedQuotes: arrayUnion(quoteText)
+      });
+      setIsSaved(true);
+    } catch (e) {
+      console.error("Error saving quote", e);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const currentGradient = GRADIENTS[colorIndex];
 
+  // For dots, if there are too many quotes (like the default 100+), 
+  // we only show dots if length is reasonable (e.g. <= 15). 
+  // Otherwise, we skip dots to avoid clutter.
+  const showDots = quotes.length <= 15;
+
   return (
     <div
-      className="w-full py-16 px-6 md:px-12 transition-colors duration-500 ease-in-out flex justify-center items-center text-center min-h-[350px] rounded-[2.5rem] shadow-xl overflow-hidden"
+      className="w-full relative py-16 px-6 md:px-16 transition-colors duration-500 ease-in-out flex flex-col justify-center items-center text-center min-h-[350px] rounded-[2.5rem] shadow-xl overflow-hidden group"
       style={{ background: currentGradient, color: '#ffffff' }}
     >
-      <div
-        className={`max-w-4xl transition-all duration-500 ease-in-out transform ${fade ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
+      {title && (
+        <h3 className="absolute top-6 left-8 text-sm font-black uppercase tracking-widest opacity-80 z-10">
+          {title}
+        </h3>
+      )}
+
+      {/* Navigation Arrows */}
+      <button
+        onClick={handlePrev}
+        className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/20 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/40 z-10"
+        aria-label="Previous quote"
       >
-        <p className="text-xl md:text-2xl lg:text-3xl font-serif leading-relaxed font-medium italic">
-          "{QUOTES[index]}"
+        <ChevronLeft size={24} />
+      </button>
+
+      <button
+        onClick={handleNext}
+        className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/20 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/40 z-10"
+        aria-label="Next quote"
+      >
+        <ChevronRight size={24} />
+      </button>
+
+      {/* Save Button */}
+      <button
+        onClick={handleSaveQuote}
+        disabled={isSaved || isSaving}
+        className={`absolute top-6 right-6 p-3 rounded-full flex items-center justify-center transition-all z-10 ${isSaved ? 'bg-white text-rose-500 shadow-lg scale-110' : 'bg-black/20 text-white hover:bg-black/40'}`}
+        title={isSaved ? "Saved to favourites" : "Save this quote"}
+      >
+        <Heart size={20} className={isSaved ? "fill-rose-500" : ""} />
+      </button>
+
+      <div
+        className={`max-w-4xl w-full transition-all duration-300 ease-in-out transform ${fade ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
+      >
+        <p className="text-xl md:text-2xl lg:text-3xl font-serif leading-relaxed font-medium italic px-4">
+          "{quotes[index]}"
         </p>
 
         <div className="mt-8">
@@ -80,6 +156,20 @@ const QuoteSlider: React.FC = () => {
           </span>
         </div>
       </div>
+
+      {/* Navigation Dots */}
+      {showDots && quotes.length > 1 && (
+        <div className="absolute bottom-6 flex gap-2">
+          {quotes.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => handleDotClick(i)}
+              className={`w-2 h-2 rounded-full transition-all ${index === i ? 'bg-white w-6' : 'bg-white/40 hover:bg-white/70'}`}
+              aria-label={`Go to quote ${i + 1}`}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 };

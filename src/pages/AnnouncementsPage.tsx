@@ -56,10 +56,11 @@ const AnnouncementsPage: React.FC = () => {
             )}
             <div className="p-8">
               <div className="flex items-center gap-3 mb-4">
-                <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${ann.category === 'Event' ? 'bg-magenta-100 text-magenta-600' :
-                  ann.category === 'News' ? 'bg-teal-100 text-teal-600' : 'bg-purple-100 text-purple-600'
+                <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${ann.category === 'events' || ann.category === 'Event' ? 'bg-magenta-100 text-magenta-600' :
+                  ann.category === 'News' ? 'bg-teal-100 text-teal-600' :
+                    ann.category === 'maintenance' ? 'bg-red-100 text-red-600' : 'bg-purple-100 text-purple-600'
                   }`}>
-                  {ann.category}
+                  {ann.category || 'General'}
                 </span>
                 {ann.isPinned && (
                   <span className="flex items-center gap-1 text-[10px] font-bold text-gold-600">
@@ -73,8 +74,8 @@ const AnnouncementsPage: React.FC = () => {
               <h3 className="text-2xl font-playfair font-bold text-navy-900 mb-4 group-hover:text-purple-600 transition-colors">
                 {ann.title}
               </h3>
-              <p className="text-navy-600 leading-relaxed mb-8">
-                {ann.content}
+              <p className="text-navy-600 leading-relaxed mb-8 whitespace-pre-wrap">
+                {ann.content || ann.message}
               </p>
               <div className="flex justify-between items-center pt-6 border-t border-neutral-50">
                 <button className="flex items-center gap-2 text-sm font-bold text-navy-900 hover:text-purple-600 transition-colors">

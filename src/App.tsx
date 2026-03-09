@@ -36,6 +36,7 @@ import CookieConsent from './components/CookieConsent';
 import MenuLink from './components/MenuLink';
 import EmailVerification from './components/EmailVerification';
 import ProfileDropdown from './components/ProfileDropdown';
+import Tooltip from './components/Tooltip';
 import EnhancedSearchBar from './components/EnhancedSearchBar';
 import NotificationBell from './components/NotificationBell';
 import MultiFunctionFAB from './components/MultiFunctionFAB';
@@ -52,6 +53,7 @@ const BookClubPage = lazy(() => import('./pages/BookClubPage'));
 const GamesPage = lazy(() => import('./pages/GamesPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const AdminPage = lazy(() => import('./pages/AdminPage'));
+const CreateAnnouncementPage = lazy(() => import('./pages/CreateAnnouncementPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const SignupPage = lazy(() => import('./pages/SignupPage'));
 const SetupPage = lazy(() => import('./pages/SetupPage'));
@@ -376,7 +378,12 @@ const Layout: React.FC = () => {
       <OfflineBanner />
       <CookieConsent />
       <MultiFunctionFAB showScrollTop={showScrollTop} onScrollTop={() => window.scrollTo({ top: 0, behavior: 'smooth' })} />
-      <EnhancedTickerBar message={tickerMessage} onClickMessage={() => navigate('/announcements')} />
+      <EnhancedTickerBar
+        message={announcements.filter(a => a.status === 'active' && a.displaySettings?.showInTicker && a.ticker?.enabled).length > 0
+          ? announcements.filter(a => a.status === 'active' && a.displaySettings?.showInTicker && a.ticker?.enabled).map(a => a.ticker?.text || a.title).join(' ⟡ ')
+          : tickerMessage}
+        onClickMessage={() => navigate('/announcements')}
+      />
 
       {user && !user.isGuest && !auth.currentUser?.emailVerified && (
         <div className="bg-gold-500 text-navy-900 py-3 px-4 text-center text-[10px] font-bold uppercase tracking-widest relative z-[40] animate-in slide-in-from-top">
@@ -445,6 +452,7 @@ const Layout: React.FC = () => {
             <Route path="/contact" element={<ContactPage />} />
             <Route path="/setup" element={<ProtectedRoute user={user}><SetupPage /></ProtectedRoute>} />
             <Route path="/admin" element={isAdmin ? <AdminPage user={user} /> : <Navigate to="/" />} />
+            <Route path="/admin/announcements/create" element={isAdmin ? <CreateAnnouncementPage /> : <Navigate to="/" />} />
             <Route path="/terms" element={<TermsOfUse />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/cookies" element={<CookiePolicy />} />
@@ -459,12 +467,11 @@ const Layout: React.FC = () => {
       <Footer user={user} branding={branding} siteContent={siteContent} />
 
       <div className={`fixed inset-0 z-[100] flex justify-end transition-all ${isMenuOpen ? 'visible pointer-events-auto' : 'invisible pointer-events-none'}`}>
-        <div
-          className={`mobile-nav-overlay absolute inset-0 bg-navy-900/60 backdrop-blur-sm ${isMenuOpen ? 'open' : ''}`}
+        <div className={`mobile-nav-overlay absolute inset-0 bg-navy-900/60 backdrop-blur-sm ${isMenuOpen ? 'open' : ''}`}
           onClick={() => setIsMenuOpen(false)}
         ></div>
-        <div className={`mobile-nav-drawer relative w-80 h-full bg-white shadow-2xl p-8 flex flex-col overflow-y-auto animate-in slide-in-from-right duration-300 ${isMenuOpen ? 'open' : ''}`}>
-          <button onClick={() => setIsMenuOpen(false)} className="absolute top-6 right-6 p-2 min-h-[44px] min-w-[44px] text-navy-200 hover:text-navy-900 hover:bg-neutral-100 rounded-full transition-all flex items-center justify-center"><X size={32} /></button>
+        <div className={`mobile-nav-drawer relative w-[380px] max-w-[90vw] h-full bg-white shadow-2xl p-8 flex flex-col overflow-y-auto animate-in slide-in-from-right duration-300 ${isMenuOpen ? 'open' : ''}`}>
+          <button onClick={() => setIsMenuOpen(false)} className="absolute top-6 right-6 p-2 min-h-[44px] min-w-[44px] text-navy-400 hover:text-navy-900 hover:bg-neutral-100 rounded-full transition-all flex items-center justify-center"><X size={32} /></button>
           <div className="mt-16 space-y-8 flex-grow">
             {user && !user.isGuest ? (
               <div className="flex items-center gap-4 px-2">
@@ -473,14 +480,18 @@ const Layout: React.FC = () => {
                     <img src={user.photoURL || APP_CONFIG.AVATAR_MALE} alt={user.name} className="w-full h-full object-cover rounded-full" />
                   </div>
                 </Link>
-                <div className="flex flex-col justify-center h-14">
-                  <Link to="/profile" onClick={() => setIsMenuOpen(false)} className="text-sm font-bold text-navy-900 leading-tight hover:text-gold-600 transition-colors line-clamp-1">
-                    Bro/Sis {user.name}
-                  </Link>
+                <div className="flex flex-col justify-center h-14 min-w-0">
+                  <Tooltip content={<>Bro/Sis {user.name}</>}>
+                    <Link to="/profile" onClick={() => setIsMenuOpen(false)} className="text-sm font-bold text-navy-900 leading-tight hover:text-gold-600 transition-colors block truncate w-full" style={{ whiteSpace: user.name && !user.name.includes(' ') && user.name.length > 20 ? 'normal' : 'nowrap', overflowWrap: 'break-word' }}>
+                      Bro/Sis {user.name.includes(' ') ? user.name.split(' ')[0] : user.name}
+                    </Link>
+                  </Tooltip>
                   {user.centre && (
-                    <span className="text-[10px] italic text-navy-500 leading-tight line-clamp-2 mt-0.5">
-                      {user.centre}
-                    </span>
+                    <Tooltip content={<>{user.centre}</>}>
+                      <span className="text-[10px] italic text-navy-500 leading-tight truncate w-full block mt-0.5">
+                        {user.centre.replace('Sathya Sai Baba Centre of ', 'SSBC ').replace('Sathya Sai Bhajan Unit of ', 'SSBU ')}
+                      </span>
+                    </Tooltip>
                   )}
                 </div>
               </div>

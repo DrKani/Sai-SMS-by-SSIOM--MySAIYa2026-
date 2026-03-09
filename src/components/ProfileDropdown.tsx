@@ -66,7 +66,7 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ user, isAdmin, onLogo
             >
                 <SaiAvatar gender={user.gender || 'male'} photoURL={user.photoURL} size={40} />
                 <div className="hidden lg:flex flex-col items-start bg-transparent ml-2">
-                    <span className="text-xs font-bold text-navy-900 leading-tight">
+                    <span className="text-xs font-bold text-white leading-tight hover:text-transparent hover:bg-clip-text hover:bg-gold-gradient transition-all">
                         {user.name || 'Devotee'}
                     </span>
                     {isAdmin && (

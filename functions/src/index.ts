@@ -331,3 +331,182 @@ export const awardBadges = functions.firestore
         console.log(`Updated badges for user ${uid}. Total count: ${totalCount}, Streak: ${currentStreak}`);
         return null;
     });
+
+/**
+ * Create Announcement Callable
+ * Allows admins to securely create announcements.
+ */
+export const createAnnouncement = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'Must be logged in.');
+    }
+    const db = admin.firestore();
+    const userDocRef = db.doc(`users/${context.auth.uid}`);
+    const userSnap = await userDocRef.get();
+    const userData = userSnap.data();
+
+    // Verify admin
+    if (!userData?.isAdmin && !context.auth.token.admin) {
+        throw new functions.https.HttpsError('permission-denied', 'Only admins can create announcements');
+    }
+
+    const annData = {
+        ...data,
+        id: `ann_${Date.now()}`,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    await db.collection('announcements').doc(annData.id).set(annData);
+    return { success: true, id: annData.id };
+});
+
+/**
+ * Auto-generate milestone announcements on user creation
+ */
+export const onUserCreated = functions.firestore
+    .document('users/{userId}')
+    .onCreate(async (snap, context) => {
+        const user = snap.data();
+        const { state, name } = user;
+        const db = admin.firestore();
+
+        if (state) {
+            const stateUsers = await db.collection('users').where('state', '==', state).limit(2).get();
+            if (stateUsers.size === 1) {
+                // First user from this state
+                const annData = {
+                    title: `New State Reached! 🎉`,
+                    message: `${state} is now represented on Sai SMS! Welcome ${name}!`,
+                    type: 'celebration',
+                    category: 'general',
+                    status: 'active',
+                    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                    displaySettings: {
+                        showInTicker: true,
+                        showInBellNotification: true,
+                        showInAnnouncementsPage: true,
+                        isPinned: false,
+                        priority: 'high'
+                    },
+                    ticker: {
+                        enabled: true,
+                        text: `🎉 A huge welcome to ${name}, our first member from ${state}!`,
+                        duration: 30,
+                        clickable: false
+                    },
+                    notification: {
+                        enabled: true,
+                        title: `New State Reached!`,
+                        body: `${state} is now represented on Sai SMS! Welcome ${name}!`,
+                        deliverTo: 'all',
+                        sendImmediately: true,
+                        channels: { inApp: true, pushNotification: false, email: false, sms: false }
+                    }
+                };
+                await db.collection('announcements').add(annData);
+            }
+        }
+    });
+
+/**
+ * Auto-generate milestone announcements on sadhana submission
+ */
+export const onSadhanaDailySubmit = functions.firestore
+    .document('sadhanaDaily/{docId}')
+    .onCreate(async (snap, context) => {
+        const submission = snap.data();
+        const { uid, type } = submission;
+        if (type !== 'likitha') return; // example: Likitha Japa specific milestone
+
+        const db = admin.firestore();
+        const userSubmissions = await db.collection('sadhanaDaily').where('uid', '==', uid).where('type', '==', 'likitha').get();
+        const userJapaCount = userSubmissions.docs.reduce((acc, doc) => acc + (doc.data().count || 0), 0);
+
+        const thresholds = [108, 1000, 10000];
+        const milestoneReached = thresholds.find(t => userJapaCount >= t && (userJapaCount - (submission.count || 0)) < t);
+
+        if (milestoneReached) {
+            const userSnap = await db.doc(`users/${uid}`).get();
+            const userName = userSnap.data()?.name || 'A Devotee';
+
+            const annData = {
+                title: `Likitha Japa Milestone! 🌺`,
+                message: `Congratulations to ${userName} for completing ${milestoneReached} Likitha Japa mantras!`,
+                type: 'celebration',
+                category: 'general',
+                status: 'active',
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                displaySettings: {
+                    showInTicker: true,
+                    showInBellNotification: true,
+                    showInAnnouncementsPage: true,
+                    isPinned: false,
+                    priority: 'normal'
+                },
+                ticker: {
+                    enabled: true,
+                    text: `🌺 ${userName} just reached ${milestoneReached} Likitha Japas! Keep up the sadhana!`,
+                    duration: 30,
+                    clickable: false
+                },
+                notification: {
+                    enabled: true,
+                    title: `Likitha Japa Milestone!`,
+                    body: `${userName} just reached ${milestoneReached} Likitha Japas!`,
+                    deliverTo: 'all',
+                    sendImmediately: true,
+                    channels: { inApp: true, pushNotification: false, email: false, sms: false }
+                }
+            };
+            await db.collection('announcements').add(annData);
+        }
+    });
+
+/**
+ * Distribute Notifications on Announcement Creation
+ * Fans out notifications to users if the announcement has notifications enabled.
+ */
+export const onAnnouncementCreated = functions.firestore
+    .document('announcements/{docId}')
+    .onCreate(async (snap, context) => {
+        const announcement = snap.data();
+        if (!announcement.notification?.enabled) return;
+
+        const { title, body } = announcement.notification;
+        const db = admin.firestore();
+
+        // Get all users (Simple targeted push for MVP, can be extended later for roles/centers)
+        const usersSnap = await db.collection('users').get();
+        if (usersSnap.empty) return;
+
+        const chunks: FirebaseFirestore.DocumentData[][] = [];
+        let currentChunk: FirebaseFirestore.DocumentData[] = [];
+        usersSnap.docs.forEach(doc => {
+            currentChunk.push(doc.data());
+            if (currentChunk.length === 450) { // Limit to 450 per batch to be safe
+                chunks.push(currentChunk);
+                currentChunk = [];
+            }
+        });
+        if (currentChunk.length > 0) chunks.push(currentChunk);
+
+        for (const chunk of chunks) {
+            const batch = db.batch();
+            for (const user of chunk) {
+                const notifRef = db.collection('notifications').doc();
+                batch.set(notifRef, {
+                    uid: user.uid,
+                    title: title || announcement.title,
+                    message: body || announcement.message || announcement.content || '',
+                    type: 'system',
+                    isRead: false,
+                    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                    announcementId: snap.id,
+                    metadata: { route: '/announcements' }
+                });
+            }
+            await batch.commit();
+        }
+    });
+
