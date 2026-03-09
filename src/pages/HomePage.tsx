@@ -3,7 +3,7 @@ import {
   ArrowRight, Library,
   Calendar, Users, Target,
   Gamepad2, ChevronRight,
-  Mic, ScrollText, MessageSquare
+  Mic, ScrollText, MessageSquare, MapPin, Award
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Announcement, BookClubWeek, SiteContent, Reflection } from '../types';
@@ -32,22 +32,6 @@ const TileCard: React.FC<{
     <div className="relative z-10">
       <h3 className="text-2xl font-serif font-bold mb-2 leading-tight">{label}</h3>
       <p className="text-[10px] opacity-80 uppercase tracking-widest font-black leading-tight">{sub}</p>
-    </div>
-  </Link>
-);
-
-const HomeStatCard: React.FC<{
-  icon: React.ReactNode; label: string; value: string; sub: string; color: string; to: string;
-}> = ({ icon, label, value, sub, color, to }) => (
-  <Link to={to} className={`${color} text-white p-10 rounded-[2.5rem] shadow-xl hover:-translate-y-2 hover:shadow-2xl transition-all flex flex-col items-center text-center gap-6 group relative overflow-hidden`}>
-    <div className="absolute top-0 right-0 p-12 bg-white/5 -mr-12 -mt-12 rounded-full group-hover:scale-150 transition-transform duration-700" />
-    <div className="p-6 bg-white/10 rounded-[2rem] group-hover:scale-110 transition-transform shadow-inner relative z-10 border border-white/10">
-      {icon}
-    </div>
-    <div className="relative z-10">
-      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/70 mb-1">{label}</span>
-      <h4 className="text-4xl font-black text-white mb-2">{value}</h4>
-      <p className="text-[8px] font-bold text-white/60 uppercase tracking-widest">{sub}</p>
     </div>
   </Link>
 );
@@ -103,6 +87,25 @@ const HomePage: React.FC = () => {
       }))
       .sort((a, b) => b.chants - a.chants)
       .slice(0, 8);
+  }, [globalStats]);
+
+  // Derived: top contributing centres (from real-time stats)
+  const topCentres = useMemo(() => {
+    if (!globalStats?.centres) return [];
+    return Object.entries(globalStats.centres)
+      .map(([name, data]) => ({ name, totalChants: data.totalChants || 0, memberCount: data.memberCount || 0 }))
+      .sort((a, b) => b.totalChants - a.totalChants)
+      .slice(0, 5);
+  }, [globalStats]);
+
+  // Derived: top contributing states (from real-time stats)
+  const topStates = useMemo(() => {
+    if (!globalStats?.states) return [];
+    return MALAYSIA_STATES
+      .map(name => ({ name, chants: globalStats.states?.[name]?.chants || 0 }))
+      .filter(s => s.chants > 0)
+      .sort((a, b) => b.chants - a.chants)
+      .slice(0, 6);
   }, [globalStats]);
 
   // Non-blocking effects — Firebase data loaded progressively after first paint
@@ -215,31 +218,147 @@ const HomePage: React.FC = () => {
         <TileCard to="/dashboard" icon={<Target size={40} />} label="Personal Dashboard" sub="My Progress 2026" color="bg-[#5726bf]" />
       </div>
 
-      {/* Our Collective Prayer — always renders, stats are progressive */}
-      <section className="bg-white p-10 rounded-[2rem] shadow-xl border border-navy-50">
-        <div className="flex flex-col md:flex-row justify-between items-center gap-6 mb-12 text-center md:text-left">
-          <div>
-            <h2 className="text-4xl font-serif font-bold text-navy-900 mb-2">Our Collective Prayer</h2>
-            <p className="text-navy-500 font-medium">Join fellow Malaysians in offering to Swami our Sadhana</p>
+      {/* Our Collective Offering — unified tile combining grand total + who contributed */}
+      <section className="bg-white rounded-[2rem] shadow-xl border border-navy-50 overflow-hidden">
+        {/* Header */}
+        <div className="bg-navy-900 px-10 py-8 flex flex-col md:flex-row justify-between items-center gap-4">
+          <div className="text-center md:text-left">
+            <h2 className="text-3xl md:text-4xl font-serif font-bold text-white mb-1">Our Collective Offering</h2>
+            <p className="text-navy-200 text-sm font-medium">Malaysia's unified Namasmarana — one nation, one offering to Swami</p>
           </div>
-          <div className="bg-gold-gradient p-[1px] rounded-3xl overflow-hidden shadow-xl shadow-gold-500/10 hover:scale-105 transition-transform cursor-pointer">
-            <div className="bg-white/90 backdrop-blur-md px-8 py-3 rounded-[calc(1.5rem-1px)] flex items-center gap-4">
-              <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.6)]" />
-              <span className="text-sm font-black uppercase tracking-[0.2em] text-navy-900">System Live</span>
-            </div>
+          <div className="flex items-center gap-3">
+            <div className="w-2.5 h-2.5 bg-green-400 rounded-full animate-pulse shadow-[0_0_8px_rgba(74,222,128,0.6)]" />
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/70">Live</span>
+            {globalStats?.lastUpdated && (
+              <span className="text-[9px] text-white/40 font-medium">
+                Updated {new Date(globalStats.lastUpdated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            )}
           </div>
         </div>
 
-        {/* Stats — shown progressively once Firebase responds */}
         {globalStats && globalStats.totalChants > 0 ? (
-          <div className="space-y-12">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              <HomeStatCard icon={<Users size={32} />} label="Participants" value={globalStats.totalParticipants.toLocaleString()} sub="Malaysia Wide Devotees" color="bg-navy-900" to="/dashboard" />
-              <HomeStatCard icon={<Mic size={32} />} label="Total Chants" value={globalStats.totalChants.toLocaleString()} sub="Cumulative National Count" color="bg-[#bf0449]" to="/namasmarana" />
-              <HomeStatCard icon={<Target size={32} />} label="Offering Goal" value={`${globalStats.goalPercent}%`} sub="National Target 2026" color="bg-[#009688]" to="/dashboard" />
+          <div className="p-8 md:p-10 space-y-10">
+            {/* ── Two-column layout: Grand Total | Who Contributed ── */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+
+              {/* LEFT — National Grand Total */}
+              <div className="space-y-6">
+                <div className="bg-gradient-to-br from-navy-900 to-[#1a3a5c] rounded-[2rem] p-8 text-white relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-40 h-40 bg-gold-500/5 rounded-full -mr-16 -mt-16" />
+                  <span className="text-[10px] font-black uppercase tracking-[0.3em] text-gold-500/80 mb-3 block">National Grand Total</span>
+                  <div className="flex items-baseline gap-3 mb-6">
+                    <span className="text-5xl md:text-6xl font-black tabular-nums">{globalStats.totalChants.toLocaleString()}</span>
+                    <span className="text-sm text-white/50 font-bold uppercase">Chants</span>
+                  </div>
+
+                  {/* Progress bar */}
+                  <div className="mb-6">
+                    <div className="flex justify-between text-[9px] font-black uppercase tracking-widest text-white/40 mb-2">
+                      <span>National Target 2026</span>
+                      <span>{globalStats.goalPercent}%</span>
+                    </div>
+                    <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                      <div className="h-full bg-gold-gradient rounded-full transition-all duration-1000" style={{ width: `${globalStats.goalPercent}%` }} />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 text-white/50">
+                    <Users size={14} />
+                    <span className="text-xs font-bold">{globalStats.totalParticipants.toLocaleString()} devotees contributing</span>
+                  </div>
+                </div>
+
+                {/* Mantra-type subtotals */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="bg-orange-50 rounded-2xl p-5 text-center">
+                    <span className="text-[9px] font-black uppercase tracking-widest text-orange-400 block mb-1">Gayathri</span>
+                    <span className="text-xl font-black text-orange-600">{(globalStats.gayathriTotal || 0).toLocaleString()}</span>
+                  </div>
+                  <div className="bg-rose-50 rounded-2xl p-5 text-center">
+                    <span className="text-[9px] font-black uppercase tracking-widest text-rose-400 block mb-1">Sai Gayathri</span>
+                    <span className="text-xl font-black text-rose-600">{(globalStats.saiGayathriTotal || 0).toLocaleString()}</span>
+                  </div>
+                  <div className="bg-violet-50 rounded-2xl p-5 text-center">
+                    <span className="text-[9px] font-black uppercase tracking-widest text-violet-400 block mb-1">Om Sai Ram</span>
+                    <span className="text-xl font-black text-violet-600">{(globalStats.omSaiRamTotal || 0).toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* RIGHT — Who Contributed */}
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-lg font-serif font-bold text-navy-900 mb-1">Who Contributed</h3>
+                  <p className="text-[10px] text-navy-400 font-black uppercase tracking-widest">Community behind the national total</p>
+                </div>
+
+                {/* Top contributing centres */}
+                {topCentres.length > 0 && (
+                  <div className="bg-neutral-50 rounded-2xl p-6 border border-navy-50">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Award size={14} className="text-gold-500" />
+                      <span className="text-[10px] font-black uppercase tracking-widest text-navy-400">Top Centres</span>
+                    </div>
+                    <div className="space-y-3">
+                      {topCentres.map((c, i) => (
+                        <div key={c.name} className="flex items-center gap-3">
+                          <span className={`w-6 h-6 flex items-center justify-center rounded-full text-[10px] font-black ${i === 0 ? 'bg-gold-500 text-white' : 'bg-white text-navy-400 border border-navy-100'}`}>{i + 1}</span>
+                          <div className="flex-grow">
+                            <div className="flex justify-between text-xs mb-1">
+                              <span className="font-bold text-navy-900 truncate">{c.name}</span>
+                              <span className="text-navy-400 font-bold tabular-nums">{c.totalChants.toLocaleString()}</span>
+                            </div>
+                            <div className="h-1.5 bg-white rounded-full overflow-hidden">
+                              <div className="h-full bg-navy-900 rounded-full" style={{ width: `${topCentres[0].totalChants > 0 ? (c.totalChants / topCentres[0].totalChants) * 100 : 0}%` }} />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Top contributing states */}
+                {topStates.length > 0 && (
+                  <div className="bg-neutral-50 rounded-2xl p-6 border border-navy-50">
+                    <div className="flex items-center gap-2 mb-4">
+                      <MapPin size={14} className="text-[#0367a6]" />
+                      <span className="text-[10px] font-black uppercase tracking-widest text-navy-400">Top States</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {topStates.map((s, i) => (
+                        <div key={s.name} className={`px-3 py-2 rounded-xl text-xs font-bold ${i === 0 ? 'bg-navy-900 text-gold-500' : 'bg-white text-navy-600 border border-navy-100'}`}>
+                          {s.name} <span className="text-[10px] opacity-60">{s.chants.toLocaleString()}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Recent participants */}
+                {recentParticipants.length > 0 && (
+                  <div className="bg-neutral-50 rounded-2xl p-6 border border-navy-50">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Users size={14} className="text-[#009688]" />
+                      <span className="text-[10px] font-black uppercase tracking-widest text-navy-400">Recent Participants</span>
+                    </div>
+                    <div className="flex flex-wrap gap-3">
+                      {recentParticipants.slice(0, 8).map((p, idx) => (
+                        <div key={idx} className="flex items-center gap-2 bg-white rounded-full pl-1 pr-3 py-1 border border-navy-50">
+                          <div className="w-7 h-7 rounded-full overflow-hidden bg-neutral-100">
+                            <SaiAvatar gender={p.gender} photoURL={p.photoURL} size={28} />
+                          </div>
+                          <span className="text-[10px] font-bold text-navy-700 truncate max-w-[80px]">{p.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* State breakdown chart */}
+            {/* State breakdown chart (below the two-column layout) */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 bg-neutral-50 p-8 rounded-[2rem] border border-navy-50">
               <div className="space-y-6">
                 <div>
@@ -285,47 +404,24 @@ const HomePage: React.FC = () => {
                 </ResponsiveContainer>
               </div>
             </div>
-
-            {recentParticipants.length > 0 && (
-              <div className="pt-12 border-t border-navy-50">
-                <div className="flex items-center justify-between mb-8">
-                  <div>
-                    <h4 className="text-xl font-serif font-bold text-navy-900">National Participants</h4>
-                    <p className="text-[10px] text-navy-400 font-bold uppercase tracking-widest">Devotees joining the collective offering</p>
-                  </div>
-                  <Users className="text-navy-100" size={32} />
-                </div>
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-6">
-                  {recentParticipants.map((p, idx) => (
-                    <div key={idx} className="flex flex-col items-center gap-3 group">
-                      <div className="w-16 h-16 rounded-full border-2 border-white shadow-md group-hover:scale-110 group-hover:border-gold-500 transition-all overflow-hidden bg-neutral-100">
-                        <SaiAvatar gender={p.gender} photoURL={p.photoURL} size={64} />
-                      </div>
-                      <div className="text-center">
-                        <p className="text-[10px] font-bold text-navy-900 truncate w-20">{p.name}</p>
-                        <p className="text-[8px] text-navy-400 uppercase tracking-widest truncate w-20">{p.centre || 'SSIOM'}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         ) : (
-          /* Empty state — always shown immediately if no stats yet */
-          <div className="bg-navy-900 rounded-[2rem] p-12 text-center text-white shadow-inner relative overflow-hidden group">
-            <div className="absolute inset-0 bg-gold-gradient opacity-10 group-hover:opacity-20 transition-opacity" />
-            <div className="relative z-10 flex flex-col items-center gap-6">
-              <div className="p-6 bg-white/10 rounded-full backdrop-blur">
-                <Mic size={48} className="text-gold-500" />
+          /* Empty state */
+          <div className="p-10">
+            <div className="bg-navy-900 rounded-[2rem] p-12 text-center text-white shadow-inner relative overflow-hidden group">
+              <div className="absolute inset-0 bg-gold-gradient opacity-10 group-hover:opacity-20 transition-opacity" />
+              <div className="relative z-10 flex flex-col items-center gap-6">
+                <div className="p-6 bg-white/10 rounded-full backdrop-blur">
+                  <Mic size={48} className="text-gold-500" />
+                </div>
+                <h3 className="text-3xl font-serif font-bold text-white">Be the first to offer!</h3>
+                <p className="text-navy-200 max-w-lg mb-4 text-sm font-medium leading-relaxed">
+                  The 2026 national journey has just begun. Start your Sadhana today and dedicate your first counts to Swami.
+                </p>
+                <Link to="/namasmarana" className="bg-gold-gradient text-navy-900 px-8 py-3 rounded-xl font-black uppercase tracking-widest text-[10px] flex items-center gap-2 hover:scale-105 transition-all shadow-lg shadow-gold-500/20">
+                  Start Chanting <ArrowRight size={16} />
+                </Link>
               </div>
-              <h3 className="text-3xl font-serif font-bold text-white">Be the first to offer!</h3>
-              <p className="text-navy-200 max-w-lg mb-4 text-sm font-medium leading-relaxed">
-                The 2026 national journey has just begun. Start your Sadhana today and dedicate your first counts to Swami.
-              </p>
-              <Link to="/namasmarana" className="bg-gold-gradient text-navy-900 px-8 py-3 rounded-xl font-black uppercase tracking-widest text-[10px] flex items-center gap-2 hover:scale-105 transition-all shadow-lg shadow-gold-500/20">
-                Start Chanting <ArrowRight size={16} />
-              </Link>
             </div>
           </div>
         )}

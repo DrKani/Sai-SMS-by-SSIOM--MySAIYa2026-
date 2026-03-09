@@ -38,7 +38,8 @@ import {
    BarChart as ReBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
    PieChart as RePieChart, Pie, Sector, LineChart, Line, Legend, RadialBarChart, RadialBar
 } from 'recharts';
-import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc, getDoc, query, orderBy, limit as firestoreLimit } from 'firebase/firestore';
+import { subscribeToNationalStats, NationalStats, MALAYSIA_STATES } from '../lib/nationalStats';
 import { db } from '../lib/firebase';
 import Papa from 'papaparse';
 
@@ -477,111 +478,280 @@ const ReflectionQueue = ({ adminEmail }: { adminEmail: string }) => {
 
 // 9. SADHANA ANALYTICS
 const SadhanaAnalytics = () => {
-   const [stats, setStats] = useState<any>({
-      total: 0,
-      gayathri: 0,
-      saiGayathri: 0,
-      likitha: 0,
-      centreLeaderboard: []
-   });
+   const [activeTab, setActiveTab] = useState<'national' | 'centres' | 'states' | 'users' | 'mantraLog'>('national');
+   const [nationalStats, setNationalStats] = useState<NationalStats | null>(null);
+   const [centreAggs, setCentreAggs] = useState<any[]>([]);
+   const [stateAggs, setStateAggs] = useState<any[]>([]);
+   const [userAggs, setUserAggs] = useState<any[]>([]);
+   const [mantraLog, setMantraLog] = useState<any[]>([]);
+   const [isLoading, setIsLoading] = useState(true);
 
    useEffect(() => {
-      const fetchAndAggregate = async () => {
+      // Subscribe to real-time national stats
+      const unsub = subscribeToNationalStats(stats => {
+         setNationalStats(stats);
+         setIsLoading(false);
+      });
+
+      // Load aggregate collections
+      (async () => {
          try {
-            // Aggregate real-time from Firestore
-            const usersSnap = await getDocs(collection(db, 'users'));
-            const allUsers: UserProfile[] = usersSnap.docs.map(d => d.data() as UserProfile);
+            const [centreSnap, stateSnap, userSnap, logSnap] = await Promise.all([
+               getDocs(collection(db, 'aggregates', 'byCentre')).catch(() => null),
+               getDocs(collection(db, 'aggregates', 'byState')).catch(() => null),
+               getDocs(collection(db, 'aggregates', 'byUser')).catch(() => null),
+               getDocs(collection(db, 'mantraCount')).catch(() => null),
+            ]);
 
-            let g = 0, sg = 0, l = 0;
-            const centreCounts: Record<string, number> = {};
-
-            allUsers.forEach(u => {
-               const s = JSON.parse(localStorage.getItem(`sms_stats_${u.uid}`) || '{"gayathri":0, "saiGayathri":0, "likitha":0}');
-               g += s.gayathri || 0;
-               sg += s.saiGayathri || 0;
-               l += s.likitha || 0;
-
-               const totalUser = (s.gayathri || 0) + (s.saiGayathri || 0) + ((s.likitha || 0) * 11);
-               if (u.centre) {
-                  centreCounts[u.centre] = (centreCounts[u.centre] || 0) + totalUser;
-               }
-            });
-
-            const leaderboard = Object.entries(centreCounts)
-               .map(([name, count]) => ({ name, count }))
-               .sort((a, b) => b.count - a.count)
-               .slice(0, 5); // Top 5
-
-            setStats({
-               total: g + sg + (l * 11),
-               gayathri: g,
-               saiGayathri: sg,
-               likitha: l,
-               centreLeaderboard: leaderboard
-            });
-         } catch (error) {
-            console.error("Error aggregating analytics", error);
+            if (centreSnap) setCentreAggs(centreSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+            if (stateSnap) setStateAggs(stateSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+            if (userSnap) setUserAggs(userSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+            if (logSnap) setMantraLog(logSnap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a: any, b: any) => (b.date || '').localeCompare(a.date || '')));
+         } catch (e) {
+            console.warn('Aggregate fetch error:', e);
          }
-      };
+      })();
 
-      fetchAndAggregate();
+      return unsub;
    }, []);
 
-   const pieData = [
-      { name: 'Gayathri', value: stats.gayathri, fill: '#ea7600' },
-      { name: 'Sai Gayathri', value: stats.saiGayathri, fill: '#bf0449' },
-      { name: 'Likitha Japam', value: stats.likitha * 11, fill: '#5726bf' },
-   ];
+   const pieData = nationalStats ? [
+      { name: 'Gayathri', value: nationalStats.gayathriTotal || 0, fill: '#ea7600' },
+      { name: 'Sai Gayathri', value: nationalStats.saiGayathriTotal || 0, fill: '#bf0449' },
+      { name: 'Om Sai Ram', value: nationalStats.omSaiRamTotal || 0, fill: '#5726bf' },
+   ] : [];
+
+   const centreLeaderboard = nationalStats?.centres
+      ? Object.entries(nationalStats.centres)
+         .map(([name, data]) => ({ name, count: data.totalChants || 0, members: data.memberCount || 0 }))
+         .sort((a, b) => b.count - a.count)
+         .slice(0, 10)
+      : [];
 
    return (
       <div className="space-y-8 animate-in fade-in">
-         <div className="flex justify-between items-end">
+         <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
             <div>
                <h2 className="text-3xl font-serif font-bold text-navy-900">Sadhana Analytics</h2>
-               <p className="text-sm text-navy-400">Raw count analysis and distribution.</p>
+               <p className="text-sm text-navy-400">Single source of truth — all tables from Admin Hub aggregates.</p>
             </div>
          </div>
 
-         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <Card className="p-8 flex flex-col items-center justify-center">
-               <h3 className="text-sm font-bold text-navy-900 mb-6">Offering Mix</h3>
-               <div className="h-48 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                     <RePieChart>
-                        <Pie data={pieData} innerRadius={60} outerRadius={80} dataKey="value" paddingAngle={5}>
-                           {pieData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
-                        </Pie>
-                        <Tooltip />
-                     </RePieChart>
-                  </ResponsiveContainer>
-               </div>
-               <div className="text-center mt-4">
-                  <p className="text-xs font-black uppercase text-navy-300">Total Offerings</p>
-                  <p className="text-3xl font-black text-navy-900">{stats.total.toLocaleString()}</p>
-               </div>
-            </Card>
-
-            <Card className="md:col-span-2 p-8">
-               <h3 className="text-sm font-bold text-navy-900 mb-6">Centre Leaderboard (Top 5)</h3>
-               <div className="space-y-4">
-                  {stats.centreLeaderboard.map((c: any, i: number) => (
-                     <div key={i} className="flex items-center gap-4">
-                        <span className={`w-8 h-8 flex items-center justify-center rounded-full font-black text-xs ${i === 0 ? 'bg-gold-500 text-white' : 'bg-neutral-100 text-navy-500'}`}>{i + 1}</span>
-                        <div className="flex-grow">
-                           <div className="flex justify-between text-xs font-bold mb-1">
-                              <span className="text-navy-900">{c.name}</span>
-                              <span className="text-navy-500">{c.count.toLocaleString()}</span>
-                           </div>
-                           <div className="h-2 bg-neutral-100 rounded-full overflow-hidden">
-                              <div className="h-full bg-navy-900" style={{ width: `${(c.count / stats.centreLeaderboard[0].count) * 100}%` }}></div>
-                           </div>
-                        </div>
-                     </div>
-                  ))}
-                  {stats.centreLeaderboard.length === 0 && <p className="text-center text-navy-300 italic">No data available yet.</p>}
-               </div>
-            </Card>
+         {/* Tab bar */}
+         <div className="flex flex-wrap bg-neutral-100 p-1 rounded-2xl gap-1">
+            {([
+               ['national', 'National'],
+               ['centres', 'By Centre'],
+               ['states', 'By State'],
+               ['users', 'By User'],
+               ['mantraLog', 'Mantra Count Log'],
+            ] as const).map(([key, label]) => (
+               <button key={key} onClick={() => setActiveTab(key as any)} className={`px-5 py-2 rounded-xl text-xs font-bold transition-all ${activeTab === key ? 'bg-navy-900 text-white shadow-md' : 'text-navy-400 hover:text-navy-600'}`}>{label}</button>
+            ))}
          </div>
+
+         {isLoading ? (
+            <div className="text-center py-12 text-navy-300">Loading analytics...</div>
+         ) : activeTab === 'national' ? (
+            /* ── National Aggregate ── */
+            <div className="space-y-8">
+               <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                  <Card className="p-6 text-center">
+                     <p className="text-[9px] font-black uppercase text-navy-300 mb-1">Total Namasmarana</p>
+                     <p className="text-2xl font-black text-navy-900">{(nationalStats?.totalChants || 0).toLocaleString()}</p>
+                  </Card>
+                  <Card className="p-6 text-center">
+                     <p className="text-[9px] font-black uppercase text-navy-300 mb-1">Gayathri Total</p>
+                     <p className="text-2xl font-black text-orange-600">{(nationalStats?.gayathriTotal || 0).toLocaleString()}</p>
+                  </Card>
+                  <Card className="p-6 text-center">
+                     <p className="text-[9px] font-black uppercase text-navy-300 mb-1">Sai Gayathri Total</p>
+                     <p className="text-2xl font-black text-rose-600">{(nationalStats?.saiGayathriTotal || 0).toLocaleString()}</p>
+                  </Card>
+                  <Card className="p-6 text-center">
+                     <p className="text-[9px] font-black uppercase text-navy-300 mb-1">Om Sai Ram Total</p>
+                     <p className="text-2xl font-black text-violet-600">{(nationalStats?.omSaiRamTotal || 0).toLocaleString()}</p>
+                  </Card>
+                  <Card className="p-6 text-center">
+                     <p className="text-[9px] font-black uppercase text-navy-300 mb-1">Last Updated</p>
+                     <p className="text-sm font-bold text-navy-600">{nationalStats?.lastUpdated ? new Date(nationalStats.lastUpdated).toLocaleString() : '—'}</p>
+                  </Card>
+               </div>
+
+               <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                  <Card className="p-8 flex flex-col items-center justify-center">
+                     <h3 className="text-sm font-bold text-navy-900 mb-6">Offering Mix</h3>
+                     <div className="h-48 w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                           <RePieChart>
+                              <Pie data={pieData} innerRadius={60} outerRadius={80} dataKey="value" paddingAngle={5}>
+                                 {pieData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
+                              </Pie>
+                              <Tooltip />
+                           </RePieChart>
+                        </ResponsiveContainer>
+                     </div>
+                     <div className="text-center mt-4">
+                        <p className="text-xs font-black uppercase text-navy-300">Total Namasmarana</p>
+                        <p className="text-3xl font-black text-navy-900">{(nationalStats?.totalChants || 0).toLocaleString()}</p>
+                     </div>
+                  </Card>
+
+                  <Card className="md:col-span-2 p-8">
+                     <h3 className="text-sm font-bold text-navy-900 mb-6">Centre Leaderboard (Top 10)</h3>
+                     <div className="space-y-4">
+                        {centreLeaderboard.map((c, i) => (
+                           <div key={i} className="flex items-center gap-4">
+                              <span className={`w-8 h-8 flex items-center justify-center rounded-full font-black text-xs ${i === 0 ? 'bg-gold-500 text-white' : 'bg-neutral-100 text-navy-500'}`}>{i + 1}</span>
+                              <div className="flex-grow">
+                                 <div className="flex justify-between text-xs font-bold mb-1">
+                                    <span className="text-navy-900">{c.name}</span>
+                                    <span className="text-navy-500">{c.count.toLocaleString()} <span className="text-navy-300">({c.members} members)</span></span>
+                                 </div>
+                                 <div className="h-2 bg-neutral-100 rounded-full overflow-hidden">
+                                    <div className="h-full bg-navy-900" style={{ width: `${centreLeaderboard[0]?.count > 0 ? (c.count / centreLeaderboard[0].count) * 100 : 0}%` }}></div>
+                                 </div>
+                              </div>
+                           </div>
+                        ))}
+                        {centreLeaderboard.length === 0 && <p className="text-center text-navy-300 italic">No centre data yet. Data populates as users submit chants.</p>}
+                     </div>
+                  </Card>
+               </div>
+            </div>
+         ) : activeTab === 'centres' ? (
+            /* ── By Centre Aggregate ── */
+            <Card className="p-6">
+               <h3 className="text-sm font-bold text-navy-900 mb-4">aggregates/byCentre</h3>
+               <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                     <thead>
+                        <tr className="border-b border-navy-100">
+                           <th className="text-left py-3 px-2 font-black uppercase text-[9px] text-navy-300">Sai Centre</th>
+                           <th className="text-right py-3 px-2 font-black uppercase text-[9px] text-navy-300">Member Count</th>
+                           <th className="text-right py-3 px-2 font-black uppercase text-[9px] text-navy-300">Total Mantra</th>
+                           <th className="text-right py-3 px-2 font-black uppercase text-[9px] text-navy-300">Total Om Sai Ram</th>
+                           <th className="text-right py-3 px-2 font-black uppercase text-[9px] text-navy-300">Total Chants</th>
+                           <th className="text-right py-3 px-2 font-black uppercase text-[9px] text-navy-300">Last Updated</th>
+                        </tr>
+                     </thead>
+                     <tbody>
+                        {centreAggs.length > 0 ? centreAggs.sort((a: any, b: any) => (b.totalChants || 0) - (a.totalChants || 0)).map((c: any) => (
+                           <tr key={c.id} className="border-b border-navy-50 hover:bg-neutral-50">
+                              <td className="py-3 px-2 font-bold text-navy-900">{c.saiCentre || c.id}</td>
+                              <td className="py-3 px-2 text-right tabular-nums">{(c.memberCount || 0).toLocaleString()}</td>
+                              <td className="py-3 px-2 text-right tabular-nums">{(c.totalMantra || 0).toLocaleString()}</td>
+                              <td className="py-3 px-2 text-right tabular-nums">{(c.totalOmSaiRam || 0).toLocaleString()}</td>
+                              <td className="py-3 px-2 text-right tabular-nums font-bold">{(c.totalChants || 0).toLocaleString()}</td>
+                              <td className="py-3 px-2 text-right text-navy-400">{c.lastUpdated ? new Date(c.lastUpdated).toLocaleString() : '—'}</td>
+                           </tr>
+                        )) : (
+                           <tr><td colSpan={6} className="py-8 text-center text-navy-300 italic">No centre aggregate data yet.</td></tr>
+                        )}
+                     </tbody>
+                  </table>
+               </div>
+            </Card>
+         ) : activeTab === 'states' ? (
+            /* ── By State Aggregate ── */
+            <Card className="p-6">
+               <h3 className="text-sm font-bold text-navy-900 mb-4">aggregates/byState</h3>
+               <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                     <thead>
+                        <tr className="border-b border-navy-100">
+                           <th className="text-left py-3 px-2 font-black uppercase text-[9px] text-navy-300">State / Region</th>
+                           <th className="text-right py-3 px-2 font-black uppercase text-[9px] text-navy-300">Total Mantra</th>
+                           <th className="text-right py-3 px-2 font-black uppercase text-[9px] text-navy-300">Om Sai Ram Count</th>
+                           <th className="text-right py-3 px-2 font-black uppercase text-[9px] text-navy-300">Total Namasmarana</th>
+                        </tr>
+                     </thead>
+                     <tbody>
+                        {stateAggs.length > 0 ? stateAggs.sort((a: any, b: any) => (b.totalNamasmarana || 0) - (a.totalNamasmarana || 0)).map((s: any) => (
+                           <tr key={s.id} className="border-b border-navy-50 hover:bg-neutral-50">
+                              <td className="py-3 px-2 font-bold text-navy-900">{s.stateRegion || s.id}</td>
+                              <td className="py-3 px-2 text-right tabular-nums">{(s.totalMantra || 0).toLocaleString()}</td>
+                              <td className="py-3 px-2 text-right tabular-nums">{(s.omSaiRamCount || 0).toLocaleString()}</td>
+                              <td className="py-3 px-2 text-right tabular-nums font-bold">{(s.totalNamasmarana || 0).toLocaleString()}</td>
+                           </tr>
+                        )) : (
+                           <tr><td colSpan={4} className="py-8 text-center text-navy-300 italic">No state aggregate data yet.</td></tr>
+                        )}
+                     </tbody>
+                  </table>
+               </div>
+            </Card>
+         ) : activeTab === 'users' ? (
+            /* ── By User Aggregate ── */
+            <Card className="p-6">
+               <h3 className="text-sm font-bold text-navy-900 mb-4">aggregates/byUser</h3>
+               <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                     <thead>
+                        <tr className="border-b border-navy-100">
+                           <th className="text-left py-3 px-2 font-black uppercase text-[9px] text-navy-300">User ID</th>
+                           <th className="text-right py-3 px-2 font-black uppercase text-[9px] text-navy-300">Total Mantra</th>
+                           <th className="text-right py-3 px-2 font-black uppercase text-[9px] text-navy-300">Total Om Sai Ram</th>
+                           <th className="text-right py-3 px-2 font-black uppercase text-[9px] text-navy-300">Total Chants</th>
+                        </tr>
+                     </thead>
+                     <tbody>
+                        {userAggs.length > 0 ? userAggs.sort((a: any, b: any) => (b.totalChants || 0) - (a.totalChants || 0)).map((u: any) => (
+                           <tr key={u.id} className="border-b border-navy-50 hover:bg-neutral-50">
+                              <td className="py-3 px-2 font-mono text-navy-600 text-[10px]">{u.userId || u.id}</td>
+                              <td className="py-3 px-2 text-right tabular-nums">{(u.totalMantra || 0).toLocaleString()}</td>
+                              <td className="py-3 px-2 text-right tabular-nums">{(u.totalOmSaiRam || 0).toLocaleString()}</td>
+                              <td className="py-3 px-2 text-right tabular-nums font-bold">{(u.totalChants || 0).toLocaleString()}</td>
+                           </tr>
+                        )) : (
+                           <tr><td colSpan={4} className="py-8 text-center text-navy-300 italic">No user aggregate data yet.</td></tr>
+                        )}
+                     </tbody>
+                  </table>
+               </div>
+            </Card>
+         ) : (
+            /* ── Mantra Count Raw Log ── */
+            <Card className="p-6">
+               <h3 className="text-sm font-bold text-navy-900 mb-1">Mantra Count (Raw Transactions)</h3>
+               <p className="text-[10px] text-navy-400 mb-4">Every chant submission creates one record here.</p>
+               <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                     <thead>
+                        <tr className="border-b border-navy-100">
+                           <th className="text-left py-3 px-2 font-black uppercase text-[9px] text-navy-300">User ID</th>
+                           <th className="text-left py-3 px-2 font-black uppercase text-[9px] text-navy-300">Centre</th>
+                           <th className="text-left py-3 px-2 font-black uppercase text-[9px] text-navy-300">State</th>
+                           <th className="text-left py-3 px-2 font-black uppercase text-[9px] text-navy-300">Mantra Type</th>
+                           <th className="text-right py-3 px-2 font-black uppercase text-[9px] text-navy-300">Count</th>
+                           <th className="text-right py-3 px-2 font-black uppercase text-[9px] text-navy-300">Date</th>
+                        </tr>
+                     </thead>
+                     <tbody>
+                        {mantraLog.length > 0 ? mantraLog.slice(0, 100).map((m: any) => (
+                           <tr key={m.id} className="border-b border-navy-50 hover:bg-neutral-50">
+                              <td className="py-3 px-2 font-mono text-navy-600 text-[10px]">{m.userId || '—'}</td>
+                              <td className="py-3 px-2">{m.centre || '—'}</td>
+                              <td className="py-3 px-2">{m.state || '—'}</td>
+                              <td className="py-3 px-2">
+                                 <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
+                                    m.mantraType === 'GAYATHRI' ? 'bg-orange-50 text-orange-600' :
+                                    m.mantraType === 'SAI_GAYATHRI' ? 'bg-rose-50 text-rose-600' :
+                                    'bg-violet-50 text-violet-600'
+                                 }`}>{m.mantraType || '—'}</span>
+                              </td>
+                              <td className="py-3 px-2 text-right tabular-nums font-bold">{(m.count || 0).toLocaleString()}</td>
+                              <td className="py-3 px-2 text-right text-navy-400">{m.date ? new Date(m.date).toLocaleString() : '—'}</td>
+                           </tr>
+                        )) : (
+                           <tr><td colSpan={6} className="py-8 text-center text-navy-300 italic">No transaction records yet. Records appear when users submit chants.</td></tr>
+                        )}
+                     </tbody>
+                  </table>
+                  {mantraLog.length > 100 && <p className="text-[10px] text-navy-300 text-center mt-4">Showing first 100 of {mantraLog.length} records.</p>}
+               </div>
+            </Card>
+         )}
       </div>
    );
 };
