@@ -5,7 +5,7 @@ import { DEFAULT_SITE_CONTENT } from '../constants';
 import { SiteContent } from '../types';
 import { db } from '../lib/firebase';
 import { doc, getDoc, setDoc, collection, increment as firebaseIncrement, query, where, getDocs, limit } from 'firebase/firestore';
-import { recordSadhanaOffering } from '../lib/nationalStats';
+import { recordSadhanaOffering, toMantraType } from '../lib/nationalStats';
 
 const AvatarOption = ({ gender, selected, onClick }: { gender: 'male' | 'female', selected: boolean, onClick: () => void }) => (
   <button type="button" onClick={onClick} className={`group relative flex flex-col items-center gap-2 transition-all ${selected ? 'scale-110' : 'opacity-40 grayscale hover:opacity-100 hover:grayscale-0'}`}>
@@ -78,10 +78,12 @@ const ChantingPage: React.FC = () => {
       return;
     }
 
-    // 1. Update National Stats in Firestore
+    // 1. Update National Stats in Firestore (with mantra type and centre)
     try {
       const realChantCount = type === 'likitha' ? (value * 11) : value;
-      await recordSadhanaOffering(user.uid, user.state || 'Other', realChantCount, type);
+      const mantraType = toMantraType(type);
+      const centre = user.centre || 'Unknown';
+      await recordSadhanaOffering(user.uid, user.state || 'Other', realChantCount, mantraType, centre);
     } catch (e) {
       console.warn("National stats sync failed:", e);
     }
