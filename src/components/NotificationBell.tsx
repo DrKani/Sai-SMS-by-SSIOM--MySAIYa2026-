@@ -29,7 +29,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ unreadCount, onClic
             )}
 
             {/* Tooltip */}
-            <div className="absolute right-0 top-full mt-2 bg-navy-900 text-white px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-xl z-10">
+            <div className="absolute right-0 top-full mt-2 bg-navy-900 text-white px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none shadow-xl z-10">
                 {unreadCount > 0 ? `${unreadCount} unread notification${unreadCount > 1 ? 's' : ''}` : 'Notifications'}
             </div>
         </button>

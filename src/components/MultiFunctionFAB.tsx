@@ -60,7 +60,7 @@ const MultiFunctionFAB: React.FC<MultiFunctionFABProps> = ({ showScrollTop, onSc
                     >
                         <ArrowUp size={24} strokeWidth={2.5} />
                     </button>
-                    <div className="absolute right-full mr-4 top-1/2 -translate-y-1/2 bg-navy-900 text-white px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-xl">
+                    <div className="absolute right-full mr-4 top-1/2 -translate-y-1/2 bg-navy-900 text-white px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none shadow-xl">
                         Back to Top
                     </div>
                 </div>
@@ -81,7 +81,7 @@ const MultiFunctionFAB: React.FC<MultiFunctionFABProps> = ({ showScrollTop, onSc
                             >
                                 {action.icon}
                             </Link>
-                            <div className="absolute right-full mr-4 top-1/2 -translate-y-1/2 bg-navy-900 text-white px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-xl">
+                            <div className="absolute right-full mr-4 top-1/2 -translate-y-1/2 bg-navy-900 text-white px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none shadow-xl">
                                 {action.label}
                             </div>
                         </div>
@@ -103,7 +103,7 @@ const MultiFunctionFAB: React.FC<MultiFunctionFABProps> = ({ showScrollTop, onSc
                         <Plus size={28} strokeWidth={2.5} />
                     )}
                 </button>
-                <div className="absolute right-full mr-4 top-1/2 -translate-y-1/2 bg-navy-900 text-white px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-xl">
+                <div className="absolute right-full mr-4 top-1/2 -translate-y-1/2 bg-navy-900 text-white px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none shadow-xl">
                     {isExpanded ? 'Close Menu' : 'Quick Actions'}
                 </div>
             </div>
