@@ -43,6 +43,7 @@ import MultiFunctionFAB from './components/MultiFunctionFAB';
 import EnhancedTickerBar from './components/EnhancedTickerBar';
 import Footer from './components/Footer';
 import OfflineBanner from './components/OfflineBanner';
+import MegaMenu from './components/MegaMenu';
 import { usePushNotifications } from './hooks/usePushNotifications';
 
 // Lazy load pages
@@ -72,6 +73,7 @@ const EventsPage = lazy(() => import('./pages/EventsPage'));
 const EventDetailPage = lazy(() => import('./pages/EventDetailPage'));
 const ContactPage = lazy(() => import('./pages/ContactPage'));
 const ArticlesPage = lazy(() => import('./pages/ArticlesPage'));
+const AboutPage = lazy(() => import('./pages/AboutPage'));
 
 const PageLoader = () => (
   <div className="flex-grow flex items-center justify-center min-h-[60vh]">
@@ -110,11 +112,11 @@ const NavigationListener = ({ onNavigate }: { onNavigate: () => void }) => {
 };
 
 const APP_TUTORIAL_STEPS: TutorialStep[] = [
-  { target: 'tutorial-welcome', title: 'Welcome to Sai SMS', text: 'Your digital companion for the 2026 National Sadhana Journey.' },
-  { target: 'tutorial-ticker', title: 'Live Updates', text: 'Urgent announcements and divine thoughts will appear here.' },
-  { target: 'tutorial-namasmarana', title: 'Namasmarana Count', text: 'Submit your daily mantra counts here. Every chant matters.' },
-  { target: 'tutorial-bookclub', title: 'Sai Lit Club', text: 'Access weekly readings from Swami\'s books and take quizzes.' },
-  { target: 'tutorial-dashboard', title: 'My Progress', text: 'Track your personal growth and spiritual milestones here.' }
+  { target: 'center', isWelcome: true, title: 'Welcome to Sai SMS', text: 'Your digital home for the 2026 National Sadhana Journey. Let us show you around in 4 quick steps.', primaryLabel: 'Begin Tour 🙏' },
+  { target: 'center', isWelcome: true, title: 'Namasmarana — Offer Chants', text: 'Tap "Namasmarana" from the menu to log your daily Gayathri or Om Sai Ram chants. Every chant contributes to the national collective offering to Swami.' },
+  { target: 'center', isWelcome: true, title: 'Sai Lit Club — Weekly Reading', text: 'Every week a new chapter is released for collective study. Read, reflect, and take a quiz to earn badges. Join the national reading journey!' },
+  { target: 'center', isWelcome: true, title: 'Your Personal Dashboard', text: 'Track your personal chant totals, reading streaks, spiritual milestones and badges all in one place. Your sadhana, beautifully visualised.' },
+  { target: 'center', isWelcome: true, title: 'Sai SMS Games — Play & Learn', text: 'Engage your mind with Quotescapes, Sai SMS Parikshya quizzes, Word Search, and Sacred Crossword. Life is a game — play it!', primaryLabel: 'Begin My Journey 🕉️' },
 ];
 
 const BottomNav: React.FC<{ user: UserProfile | null }> = ({ user }) => {
@@ -279,6 +281,11 @@ const Layout: React.FC = () => {
           ...doc.data()
         })) as AppNotification[];
         setNotifications(notifs);
+      }, (error) => {
+        // Gracefully handle missing Firestore composite index — notifications simply won't load.
+        // Create the index via: Firebase Console > Firestore > Indexes > Add composite index on 'notifications' (uid ASC, createdAt DESC)
+        console.warn('Notifications query error (may require Firestore composite index):', error.message);
+        setNotifications([]);
       });
     } else {
       setNotifications([]);
@@ -449,6 +456,7 @@ const Layout: React.FC = () => {
             <Route path="/calendar" element={<CalendarPage />} />
             <Route path="/events" element={<EventsPage />} />
             <Route path="/events/:eventId" element={<EventDetailPage />} />
+            <Route path="/about" element={<AboutPage />} />
             <Route path="/contact" element={<ContactPage />} />
             <Route path="/setup" element={<ProtectedRoute user={user}><SetupPage /></ProtectedRoute>} />
             <Route path="/admin" element={isAdmin ? <AdminPage user={user} /> : <Navigate to="/" />} />
@@ -466,95 +474,16 @@ const Layout: React.FC = () => {
 
       <Footer user={user} branding={branding} siteContent={siteContent} />
 
-      <div className={`fixed inset-0 z-[100] flex justify-end transition-all ${isMenuOpen ? 'visible pointer-events-auto' : 'invisible pointer-events-none'}`}>
-        <div className={`mobile-nav-overlay absolute inset-0 bg-navy-900/60 backdrop-blur-sm ${isMenuOpen ? 'open' : ''}`}
-          onClick={() => setIsMenuOpen(false)}
-        ></div>
-        <div className={`mobile-nav-drawer relative w-[380px] max-w-[90vw] h-full bg-white shadow-2xl p-8 flex flex-col overflow-y-auto animate-in slide-in-from-right duration-300 ${isMenuOpen ? 'open' : ''}`}>
-          <button onClick={() => setIsMenuOpen(false)} className="absolute top-6 right-6 p-2 min-h-[44px] min-w-[44px] text-navy-400 hover:text-navy-900 hover:bg-neutral-100 rounded-full transition-all flex items-center justify-center"><X size={32} /></button>
-          <div className="mt-16 space-y-8 flex-grow">
-            {user && !user.isGuest ? (
-              <div className="flex items-center gap-4 px-2">
-                <Link to="/dashboard" onClick={() => setIsMenuOpen(false)} className="shrink-0 flex-shrink-0">
-                  <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-gold-500 p-0.5 bg-white">
-                    <img src={user.photoURL || APP_CONFIG.AVATAR_MALE} alt={user.name} className="w-full h-full object-cover rounded-full" />
-                  </div>
-                </Link>
-                <div className="flex flex-col justify-center h-14 min-w-0">
-                  <Tooltip content={<>{user.gender === 'female' ? 'Sis' : 'Bro'} {user.name}</>}>
-                    <Link to="/profile" onClick={() => setIsMenuOpen(false)} className="text-sm font-bold text-navy-900 leading-tight hover:text-gold-600 transition-colors block truncate w-full" style={{ whiteSpace: user.name && !user.name.includes(' ') && user.name.length > 20 ? 'normal' : 'nowrap', overflowWrap: 'break-word' }}>
-                      {user.gender === 'female' ? 'Sis' : 'Bro'} {user.name.includes(' ') ? user.name.split(' ')[0] : user.name}
-                    </Link>
-                  </Tooltip>
-                  {user.centre && (
-                    <Tooltip content={<>{user.centre}</>}>
-                      <span className="text-[10px] italic text-navy-500 leading-tight truncate w-full block mt-0.5">
-                        {user.centre.replace('Sathya Sai Baba Centre of ', 'SSBC ').replace('Sathya Sai Bhajan Unit of ', 'SSBU ')}
-                      </span>
-                    </Tooltip>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="px-4 py-3 bg-neutral-100 rounded-2xl flex items-center gap-3 border-2 border-neutral-200">
-                <UserCircle size={20} className="text-navy-400" />
-                <div><p className="text-xs font-bold text-navy-900">Browsing as Guest</p><p className="text-[10px] text-navy-500"><Link to="/signup" className="text-gold-600 font-bold hover:underline" onClick={() => setIsMenuOpen(false)}>Sign up</Link> to access all</p></div>
-              </div>
-            )}
-
-            <div>
-              <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-navy-300 mb-4 px-4">Navigation</h3>
-              <ul className="space-y-1 list-none p-0 m-0 w-full">
-                <MenuLink to="/" label="Sai SMS Home" icon={<Home size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/'} />
-
-                {user ? (
-                  <>
-                    <MenuLink to="/dashboard" label="My Sai SMS Dashboard" icon={<UserCircle size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/dashboard'} />
-                    <MenuLink to="/journal" label="My Reflections" icon={<PenTool size={16} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/journal'} isChild />
-                    <MenuLink to="/dashboard" label="My Briefcase" icon={<BookOpen size={16} />} onClick={() => setIsMenuOpen(false)} isChild />
-                    <MenuLink to="/profile" label="My Profile" icon={<UserCircle size={16} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/profile'} isChild />
-                    <MenuLink to="/leaderboard" label="Sai SMS Leaderboard" icon={<Trophy size={16} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/leaderboard'} isChild />
-
-                    <MenuLink to="/namasmarana" label="Sai SMS Mantra Count" icon={<Mic size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/namasmarana' && !location.hash.includes('likitha')} />
-                    <MenuLink to="/namasmarana#likitha" label="Sai SMS Likitha Japa" icon={<PenTool size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/namasmarana' && location.hash.includes('likitha')} />
-                    <MenuLink to="/book-club" label="Sai SMS Book Club" icon={<Library size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname.startsWith('/book-club')} />
-                    <MenuLink to="/games" label="Sai SMS Play it" icon={<Gamepad2 size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/games'} />
-                    <MenuLink to="/calendar" label="Sai SMS Calendar" icon={<Calendar size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/calendar'} />
-                    <MenuLink to="/articles" label="Sai SMS Blog" icon={<ScrollText size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname.startsWith('/articles')} />
-                  </>
-                ) : (
-                  <>
-                    <MenuLink to="/namasmarana" label="Sai SMS Mantra Count" icon={<Mic size={18} />} onClick={() => setIsMenuOpen(false)} isProtected isLocked />
-                    <MenuLink to="/namasmarana#likitha" label="Sai SMS Likitha Japa" icon={<PenTool size={18} />} onClick={() => setIsMenuOpen(false)} isProtected isLocked />
-                    <MenuLink to="/book-club" label="Sai SMS Book Club" icon={<Library size={18} />} onClick={() => setIsMenuOpen(false)} isProtected isLocked />
-                    <MenuLink to="/games" label="Sai SMS Play it" icon={<Gamepad2 size={18} />} onClick={() => setIsMenuOpen(false)} isProtected isLocked />
-                    <MenuLink to="/calendar" label="Sai SMS Calendar" icon={<Calendar size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/calendar'} />
-                    <MenuLink to="/articles" label="Sai SMS Blog" icon={<ScrollText size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname.startsWith('/articles')} />
-
-                    <div className="pt-4 mt-4 border-t border-navy-50">
-                      <MenuLink to="/signin" label="Sign In" icon={<LogIn size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/signin'} />
-                      <MenuLink to="/signup" label="Sign Up" icon={<UserPlus size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/signup'} />
-                    </div>
-                  </>
-                )}
-                {isAdmin && <MenuLink to="/admin" label="Sai SMS Admin Hub" icon={<Shield size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/admin'} />}
-
-                <div className="pt-2">
-                  <MenuLink to="/about" label="About us" icon={<Info size={18} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/about'} />
-                  <MenuLink to="/contact" label="Contact Sai SMS by SSIOM" icon={<Mail size={16} />} onClick={() => setIsMenuOpen(false)} isActive={location.pathname === '/contact'} isChild />
-                </div>
-              </ul>
-            </div>
-            {user && (
-              <div className="mt-12 pt-6 border-t border-navy-50 shrink-0">
-                <button onClick={() => setShowLogoutConfirm(true)} className="w-full flex items-center justify-between min-h-[44px] py-3.5 px-4 rounded-2xl bg-red-50 text-red-600 hover:bg-red-100 transition-all font-black uppercase tracking-widest text-[10px]">
-                  <div className="flex items-center gap-4"><LogOut size={18} /><span>Sign Out</span></div>
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+      <MegaMenu
+        isOpen={isMenuOpen}
+        onClose={() => setIsMenuOpen(false)}
+        user={user}
+        isAdmin={!!isAdmin}
+        userStreak={user?.streak ?? 0}
+        bookClubProgress={user?.stats ? 'Week 2 · In progress' : ''}
+        lastActiveModule={user ? '/dashboard' : '/signin'}
+        announcements={announcements}
+      />
 
       {showLogoutConfirm && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
