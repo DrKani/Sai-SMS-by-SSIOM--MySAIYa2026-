@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Users, Mic, Target, Trophy, ChevronDown, User, ArrowRight, Medal, Crown } from 'lucide-react';
 import { NationalStats, MantraBreakdown } from '../lib/nationalStats';
 import { UserProfile } from '../types';
-import { doc, getDoc, collection, query, where, limit, getDocs } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
 // ─── Animated Number ────────────────────────────────────────────────────────
@@ -113,8 +113,9 @@ const UnifiedOfferingTile: React.FC<UnifiedOfferingTileProps> = ({ globalStats, 
                     })));
                 }
             } else {
-                // Fallback live aggregation
-                const snap = await getDocs(query(collection(db, 'users'), where('publicLeaderboard', '==', true), limit(200)));
+                // Fallback: live aggregation from ALL users — no publicLeaderboard filter
+                // so every devotee who submits chants appears immediately
+                const snap = await getDocs(collection(db, 'users'));
                 const cTotals: Record<string, { count: number; state: string }> = {};
                 const sTotals: Record<string, number> = {};
                 const mList: any[] = [];

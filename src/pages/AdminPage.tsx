@@ -2680,13 +2680,389 @@ const LeaderboardManager = ({ adminEmail }: { adminEmail: string }) => {
    );
 };
 
+// --- NAMASMARANA MANAGER ---
+const NamasmaranaManager = ({ adminEmail }: { adminEmail: string }) => {
+   const [users, setUsers] = useState<any[]>([]);
+   const [isLoading, setIsLoading] = useState(true);
+   const [searchQ, setSearchQ] = useState('');
+   const [groupBy, setGroupBy] = useState<'members' | 'state' | 'centre'>('members');
+
+   const load = async () => {
+      setIsLoading(true);
+      try {
+         const snap = await getDocs(collection(db, 'users'));
+         const list: any[] = [];
+         snap.forEach(doc => {
+            const d = doc.data();
+            const stats = d.stats || {};
+            const total = (stats.gayathri || 0) + (stats.saiGayathri || 0) + ((stats.likitha || 0) * 11);
+            if (total > 0 || d.name) {
+               list.push({
+                  uid: doc.id,
+                  name: d.name || 'Unknown',
+                  state: d.state || 'Unknown',
+                  centre: d.centre || 'Unknown',
+                  gayathri: stats.gayathri || 0,
+                  saiGayathri: stats.saiGayathri || 0,
+                  likitha: stats.likitha || 0,
+                  total,
+               });
+            }
+         });
+         list.sort((a, b) => b.total - a.total);
+         setUsers(list);
+      } catch (e) {
+         console.error(e);
+      } finally {
+         setIsLoading(false);
+      }
+   };
+
+   useEffect(() => { load(); }, []);
+
+   const filtered = users.filter(u =>
+      u.name.toLowerCase().includes(searchQ.toLowerCase()) ||
+      u.state.toLowerCase().includes(searchQ.toLowerCase()) ||
+      u.centre.toLowerCase().includes(searchQ.toLowerCase())
+   );
+
+   const grandTotal = users.reduce((acc, u) => acc + u.total, 0);
+
+   // Group summaries
+   const byState: Record<string, number> = {};
+   const byCentre: Record<string, number> = {};
+   users.forEach(u => {
+      byState[u.state] = (byState[u.state] || 0) + u.total;
+      byCentre[u.centre] = (byCentre[u.centre] || 0) + u.total;
+   });
+   const stateRows = Object.entries(byState).sort((a, b) => b[1] - a[1]);
+   const centreRows = Object.entries(byCentre).sort((a, b) => b[1] - a[1]);
+
+   const exportCSV = () => {
+      const csv = Papa.unparse(filtered.map(u => ({
+         Name: u.name, State: u.state, Centre: u.centre,
+         Gayathri: u.gayathri, 'Sai Gayathri': u.saiGayathri, 'Likitha Units': u.likitha,
+         'Total Chants': u.total
+      })));
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'namasmarana_data.csv'; a.click();
+      logAdminAction(adminEmail, 'Exported Namasmarana CSV', `${filtered.length} records`);
+   };
+
+   return (
+      <div className="space-y-8 animate-in fade-in">
+         <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+            <div>
+               <h2 className="text-3xl font-serif font-bold text-navy-900">Namasmarana Manager</h2>
+               <p className="text-sm text-navy-400">National chant submission analytics and management.</p>
+            </div>
+            <div className="flex gap-3">
+               <button onClick={load} className="flex items-center gap-2 px-4 py-2 bg-neutral-100 text-navy-600 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-neutral-200 transition-colors">
+                  <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} /> Refresh
+               </button>
+               <button onClick={exportCSV} className="flex items-center gap-2 px-4 py-2 bg-gold-gradient text-navy-900 rounded-xl font-black uppercase text-[10px] tracking-widest">
+                  <Download size={14} /> Export CSV
+               </button>
+            </div>
+         </div>
+
+         {/* Grand Total */}
+         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[
+               { label: 'Grand Total Chants', value: grandTotal.toLocaleString(), color: 'text-gold-600' },
+               { label: 'Total Members', value: users.length, color: 'text-navy-900' },
+               { label: 'States Active', value: stateRows.filter(s => s[1] > 0).length, color: 'text-blue-600' },
+               { label: 'Centres Active', value: centreRows.filter(c => c[1] > 0).length, color: 'text-purple-600' },
+            ].map(item => (
+               <Card key={item.label} className="p-6 text-center">
+                  <p className={`text-3xl font-black ${item.color}`}>{item.value}</p>
+                  <p className="text-[10px] text-navy-400 font-bold uppercase tracking-widest mt-1">{item.label}</p>
+               </Card>
+            ))}
+         </div>
+
+         {/* View Toggle */}
+         <div className="flex gap-2">
+            {(['members', 'state', 'centre'] as const).map(g => (
+               <button key={g} onClick={() => setGroupBy(g)} className={`px-5 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all ${groupBy === g ? 'bg-navy-900 text-gold-500 shadow-lg' : 'bg-white text-navy-400 border border-navy-100 hover:bg-neutral-50'}`}>
+                  By {g}
+               </button>
+            ))}
+         </div>
+
+         {groupBy === 'members' && (
+            <Card>
+               <div className="p-6 border-b border-navy-50">
+                  <div className="relative">
+                     <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-navy-300" />
+                     <input value={searchQ} onChange={e => setSearchQ(e.target.value)} placeholder="Search by name, state or centre..." className="w-full pl-12 pr-4 py-3 bg-neutral-50 rounded-xl border border-navy-50 text-sm focus:border-gold-500 outline-none" />
+                  </div>
+               </div>
+               {isLoading ? (
+                  <div className="p-12 text-center flex items-center justify-center gap-3 text-navy-300"><RefreshCw size={20} className="animate-spin" /><span>Loading...</span></div>
+               ) : (
+                  <div className="overflow-x-auto">
+                     <table className="w-full text-sm">
+                        <thead><tr className="border-b border-navy-50 bg-neutral-50 text-[10px] uppercase tracking-widest font-black text-navy-400">
+                           <th className="text-left p-4">Rank</th>
+                           <th className="text-left p-4">Member</th>
+                           <th className="text-left p-4 hidden md:table-cell">State</th>
+                           <th className="text-right p-4">Gayathri</th>
+                           <th className="text-right p-4 hidden md:table-cell">S.S. Gayathri</th>
+                           <th className="text-right p-4 hidden md:table-cell">Likitha</th>
+                           <th className="text-right p-4 font-black">Total</th>
+                        </tr></thead>
+                        <tbody>
+                           {filtered.map((u, i) => (
+                              <tr key={u.uid} className={`border-b border-navy-50 hover:bg-neutral-50 transition-colors ${i < 3 ? 'bg-gold-50/30' : ''}`}>
+                                 <td className="p-4 font-black text-navy-400 text-center">#{i + 1}</td>
+                                 <td className="p-4"><p className="font-bold text-navy-900">{u.name}</p><p className="text-[10px] text-navy-400 truncate max-w-[150px]">{u.centre}</p></td>
+                                 <td className="p-4 hidden md:table-cell text-navy-600 text-xs">{u.state}</td>
+                                 <td className="p-4 text-right text-navy-700">{u.gayathri.toLocaleString()}</td>
+                                 <td className="p-4 text-right text-navy-700 hidden md:table-cell">{u.saiGayathri.toLocaleString()}</td>
+                                 <td className="p-4 text-right text-navy-700 hidden md:table-cell">{u.likitha.toLocaleString()}</td>
+                                 <td className="p-4 text-right font-black text-gold-600">{u.total.toLocaleString()}</td>
+                              </tr>
+                           ))}
+                        </tbody>
+                     </table>
+                  </div>
+               )}
+            </Card>
+         )}
+
+         {groupBy === 'state' && (
+            <Card>
+               <div className="divide-y divide-navy-50">
+                  {stateRows.map(([state, count], i) => (
+                     <div key={state} className="flex items-center justify-between p-5 hover:bg-neutral-50">
+                        <div className="flex items-center gap-4">
+                           <span className="w-7 text-center font-black text-navy-300 text-xs">#{i + 1}</span>
+                           <span className="font-bold text-navy-900">{state}</span>
+                        </div>
+                        <span className="font-black text-gold-600">{count.toLocaleString()}</span>
+                     </div>
+                  ))}
+               </div>
+            </Card>
+         )}
+
+         {groupBy === 'centre' && (
+            <Card>
+               <div className="divide-y divide-navy-50">
+                  {centreRows.map(([centre, count], i) => (
+                     <div key={centre} className="flex items-center justify-between p-5 hover:bg-neutral-50">
+                        <div className="flex items-center gap-4">
+                           <span className="w-7 text-center font-black text-navy-300 text-xs">#{i + 1}</span>
+                           <span className="font-bold text-navy-900 text-sm">{centre}</span>
+                        </div>
+                        <span className="font-black text-gold-600">{count.toLocaleString()}</span>
+                     </div>
+                  ))}
+               </div>
+            </Card>
+         )}
+      </div>
+   );
+};
+
+// --- JOURNAL MANAGER ---
+const JournalManager = ({ adminEmail }: { adminEmail: string }) => {
+   const [entries, setEntries] = useState<any[]>([]);
+   const [isLoading, setIsLoading] = useState(true);
+   const [statusFilter, setStatusFilter] = useState<'all' | 'private' | 'shared'>('all');
+
+   const load = async () => {
+      setIsLoading(true);
+      try {
+         const snap = await getDocs(query(collection(db, 'journal'), orderBy('createdAt', 'desc')));
+         setEntries(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      } catch (e) {
+         console.error('Journal load error:', e);
+      } finally {
+         setIsLoading(false);
+      }
+   };
+
+   useEffect(() => { load(); }, []);
+
+   const deleteEntry = async (id: string) => {
+      if (!window.confirm('Permanently delete this journal entry?')) return;
+      try {
+         await deleteDoc(doc(db, 'journal', id));
+         setEntries(prev => prev.filter(e => e.id !== id));
+         logAdminAction(adminEmail, 'Deleted Journal Entry', id);
+      } catch (e) { console.error(e); }
+   };
+
+   const filtered = entries.filter(e => {
+      if (statusFilter === 'all') return true;
+      if (statusFilter === 'shared') return e.isShared || e.visibility === 'shared';
+      return !e.isShared && e.visibility !== 'shared';
+   });
+
+   return (
+      <div className="space-y-8 animate-in fade-in">
+         <div className="flex justify-between items-end">
+            <div>
+               <h2 className="text-3xl font-serif font-bold text-navy-900">Journal Manager</h2>
+               <p className="text-sm text-navy-400">View and moderate user spiritual journal entries.</p>
+            </div>
+            <button onClick={load} className="flex items-center gap-2 px-4 py-2 bg-neutral-100 text-navy-600 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-neutral-200 transition-colors">
+               <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} /> Refresh
+            </button>
+         </div>
+
+         <div className="grid grid-cols-3 gap-4">
+            {(['all', 'shared', 'private'] as const).map(s => (
+               <button key={s} onClick={() => setStatusFilter(s)} className={`p-4 rounded-2xl border-2 text-center transition-all ${statusFilter === s ? 'bg-navy-900 text-white border-navy-900 shadow-lg' : 'bg-white border-navy-50 hover:border-navy-200'}`}>
+                  <p className={`text-2xl font-black ${statusFilter === s ? 'text-gold-400' : 'text-navy-900'}`}>
+                     {s === 'all' ? entries.length : s === 'shared' ? entries.filter(e => e.isShared || e.visibility === 'shared').length : entries.filter(e => !e.isShared && e.visibility !== 'shared').length}
+                  </p>
+                  <p className={`text-[10px] font-black uppercase tracking-widest ${statusFilter === s ? 'text-white/70' : 'text-navy-400'}`}>{s}</p>
+               </button>
+            ))}
+         </div>
+
+         <Card>
+            {isLoading ? (
+               <div className="p-12 text-center flex items-center justify-center gap-3 text-navy-300"><RefreshCw size={20} className="animate-spin" /><span>Loading journal entries...</span></div>
+            ) : filtered.length === 0 ? (
+               <div className="p-16 text-center text-navy-300 italic">No journal entries found.</div>
+            ) : (
+               <div className="divide-y divide-navy-50">
+                  {filtered.map(entry => (
+                     <div key={entry.id} className="p-6 flex flex-col md:flex-row gap-4 group">
+                        <div className="shrink-0 space-y-1 md:w-44">
+                           <p className="font-bold text-navy-900 text-sm">{entry.userName || 'Anonymous'}</p>
+                           <p className="text-[10px] text-navy-400">{entry.createdAt?.toDate ? new Date(entry.createdAt.toDate()).toLocaleDateString() : 'Unknown'}</p>
+                           <span className={`inline-block px-2 py-0.5 rounded text-[9px] font-black uppercase ${entry.isShared ? 'bg-green-100 text-green-700' : 'bg-neutral-100 text-navy-500'}`}>
+                              {entry.isShared ? 'Shared' : 'Private'}
+                           </span>
+                           {entry.mood && <span className="block text-[10px] text-purple-600 font-bold">{entry.mood}</span>}
+                        </div>
+                        <div className="flex-grow">
+                           {entry.title && <p className="font-bold text-navy-900 mb-2">{entry.title}</p>}
+                           <p className="text-sm text-navy-700 leading-relaxed line-clamp-4 bg-neutral-50 rounded-xl p-4 border border-navy-50 italic">"{entry.content || entry.text || 'No content'}"</p>
+                        </div>
+                        <div className="flex md:flex-col gap-2 shrink-0 justify-end">
+                           <button onClick={() => deleteEntry(entry.id)} className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-500 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-red-100">
+                              <Trash2 size={12} /> Delete
+                           </button>
+                        </div>
+                     </div>
+                  ))}
+               </div>
+            )}
+         </Card>
+      </div>
+   );
+};
+
+// --- GAMES MANAGER ---
+const GamesManager = ({ adminEmail }: { adminEmail: string }) => {
+   const [scores, setScores] = useState<any[]>([]);
+   const [isLoading, setIsLoading] = useState(true);
+
+   const load = async () => {
+      setIsLoading(true);
+      try {
+         const snap = await getDocs(query(collection(db, 'gameScores'), orderBy('score', 'desc')));
+         setScores(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      } catch (e) {
+         // gameScores collection may not exist yet — graceful fallback
+         console.warn('gameScores collection not found yet:', e);
+         setScores([]);
+      } finally {
+         setIsLoading(false);
+      }
+   };
+
+   useEffect(() => { load(); }, []);
+
+   const totalGames = scores.length;
+   const avgScore = totalGames > 0 ? Math.round(scores.reduce((a, s) => a + (s.score || 0), 0) / totalGames) : 0;
+   const perfectScores = scores.filter(s => s.score >= 100).length;
+
+   return (
+      <div className="space-y-8 animate-in fade-in">
+         <div className="flex justify-between items-end">
+            <div>
+               <h2 className="text-3xl font-serif font-bold text-navy-900">Games Manager</h2>
+               <p className="text-sm text-navy-400">Monitor the Play It game scores and player activity.</p>
+            </div>
+            <button onClick={load} className="flex items-center gap-2 px-4 py-2 bg-neutral-100 text-navy-600 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-neutral-200 transition-colors">
+               <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} /> Refresh
+            </button>
+         </div>
+
+         <div className="grid grid-cols-3 gap-4">
+            {[
+               { label: 'Total Games Played', value: totalGames, color: 'text-navy-900' },
+               { label: 'Avg Score', value: `${avgScore}%`, color: 'text-gold-600' },
+               { label: 'Perfect Scores', value: perfectScores, color: 'text-green-600' },
+            ].map(item => (
+               <Card key={item.label} className="p-6 text-center">
+                  <p className={`text-3xl font-black ${item.color}`}>{item.value}</p>
+                  <p className="text-[10px] text-navy-400 font-bold uppercase tracking-widest mt-1">{item.label}</p>
+               </Card>
+            ))}
+         </div>
+
+         <Card>
+            {isLoading ? (
+               <div className="p-12 text-center flex items-center justify-center gap-3 text-navy-300"><RefreshCw size={20} className="animate-spin" /><span>Loading game data...</span></div>
+            ) : scores.length === 0 ? (
+               <div className="p-16 text-center text-navy-300">
+                  <Gamepad2 size={40} className="mx-auto mb-4 opacity-30" />
+                  <p className="italic">No game scores recorded yet. Play It scores will appear here as users play.</p>
+               </div>
+            ) : (
+               <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                     <thead><tr className="border-b border-navy-50 bg-neutral-50 text-[10px] uppercase tracking-widest font-black text-navy-400">
+                        <th className="text-left p-4">Rank</th>
+                        <th className="text-left p-4">Player</th>
+                        <th className="text-left p-4">Game</th>
+                        <th className="text-right p-4">Score</th>
+                        <th className="text-right p-4">Date</th>
+                     </tr></thead>
+                     <tbody>
+                        {scores.map((s, i) => (
+                           <tr key={s.id} className="border-b border-navy-50 hover:bg-neutral-50 transition-colors">
+                              <td className="p-4 font-black text-navy-400 text-center">#{i + 1}</td>
+                              <td className="p-4 font-bold text-navy-900">{s.userName || 'Anonymous'}</td>
+                              <td className="p-4 text-navy-600 text-xs">{s.gameName || 'Quiz'}</td>
+                              <td className="p-4 text-right font-black text-gold-600">{s.score}%</td>
+                              <td className="p-4 text-right text-[10px] text-navy-400">{s.createdAt?.toDate ? new Date(s.createdAt.toDate()).toLocaleDateString() : '-'}</td>
+                           </tr>
+                        ))}
+                     </tbody>
+                  </table>
+               </div>
+            )}
+         </Card>
+      </div>
+   );
+};
+
 // --- MAIN PAGE ---
 
 const AdminPage: React.FC<{ user: UserProfile | null }> = ({ user }) => {
-   const [isLocked, setIsLocked] = useState(() => sessionStorage.getItem('sms_admin_session') !== 'active');
+   // Force password on every page LOAD — clear any existing session on mount
+   const [isLocked, setIsLocked] = useState(true);
    const [password, setPassword] = useState('');
+   const [loginError, setLoginError] = useState('');
    const [activeModule, setActiveModule] = useState('comms');
    const navigate = useNavigate();
+
+   // Clear admin session on unmount (navigating away requires re-auth on return)
+   useEffect(() => {
+      return () => {
+         sessionStorage.removeItem('sms_admin_session');
+      };
+   }, []);
 
    // Route Protection
    useEffect(() => {
@@ -2705,33 +3081,55 @@ const AdminPage: React.FC<{ user: UserProfile | null }> = ({ user }) => {
 
    const handleUnlock = (e: React.FormEvent) => {
       e.preventDefault();
+      setLoginError('');
       if (password === ADMIN_CONFIG.MASTER_PASSWORD) {
          setIsLocked(false);
          sessionStorage.setItem('sms_admin_session', 'active');
          logAdminAction(user?.email || 'system', 'Admin Logged In', 'Hub Access');
       } else {
-         alert("Invalid Spiritual Credentials.");
+         setLoginError('Incorrect master password. Please try again.');
+         setPassword('');
       }
    };
 
    const handleLogout = () => {
       sessionStorage.removeItem('sms_admin_session');
       setIsLocked(true);
-      window.location.hash = '#/';
+      navigate('/');
    };
 
    if (isLocked) {
       return (
-         <div className="min-h-[85vh] flex items-center justify-center bg-neutral-50 px-4">
-            <div className="max-w-md w-full bg-white rounded-[2.5rem] shadow-2xl p-12 text-center border border-navy-50 animate-in zoom-in-95">
-               <div className="w-24 h-24 bg-navy-900 rounded-[2rem] mx-auto flex items-center justify-center text-gold-500 shadow-xl mb-10"><ShieldCheck size={48} /></div>
-               <h1 className="text-4xl font-serif font-bold text-navy-900 mb-2">National Command</h1>
-               <p className="text-xs text-navy-300 font-bold uppercase tracking-widest">SSIOM Spiritual Infrastructure</p>
-               <form onSubmit={handleUnlock} className="mt-12 space-y-6">
-                  <input type="password" required className="w-full p-5 bg-neutral-50 rounded-2xl border border-navy-50 font-black text-center outline-none focus:border-gold-500" placeholder="Master Password" value={password} onChange={e => setPassword(e.target.value)} />
-                  <button type="submit" className="w-full py-5 bg-navy-900 text-gold-500 rounded-2xl font-black uppercase text-xs shadow-xl active:scale-95 transition-all">Unlock Management Hub</button>
+         <div className="min-h-[85vh] flex items-center justify-center bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800 px-4">
+            <div className="max-w-md w-full bg-white rounded-[2.5rem] shadow-2xl p-12 text-center border border-navy-50 animate-in zoom-in-95 duration-300">
+               <div className="w-24 h-24 bg-navy-900 rounded-[2rem] mx-auto flex items-center justify-center text-gold-500 shadow-xl mb-10">
+                  <ShieldCheck size={48} />
+               </div>
+               <h1 className="text-4xl font-serif font-bold text-navy-900 mb-2">National Command</h1>
+               <p className="text-xs text-navy-300 font-bold uppercase tracking-widest mb-1">SSIOM Spiritual Infrastructure</p>
+               <p className="text-[10px] text-navy-200 mb-10">Authorized personnel only. Enter the master password to continue.</p>
+               <form onSubmit={handleUnlock} className="space-y-4">
+                  <input
+                     type="password"
+                     required
+                     autoFocus
+                     className="w-full p-5 bg-neutral-50 rounded-2xl border-2 border-navy-50 font-black text-center outline-none focus:border-gold-500 transition-colors"
+                     placeholder="Master Password"
+                     value={password}
+                     onChange={e => { setPassword(e.target.value); setLoginError(''); }}
+                  />
+                  {loginError && (
+                     <p className="text-red-600 text-xs font-bold flex items-center justify-center gap-1">
+                        <XCircle size={14} /> {loginError}
+                     </p>
+                  )}
+                  <button type="submit" className="w-full py-5 bg-navy-900 text-gold-500 rounded-2xl font-black uppercase text-xs shadow-xl active:scale-95 transition-all hover:bg-navy-800">
+                     Unlock Management Hub
+                  </button>
                </form>
-               <button onClick={() => window.location.hash = '#/'} className="mt-8 text-[9px] font-black uppercase text-navy-200 hover:text-navy-900 transition-colors">Return to Public Portal</button>
+               <button onClick={() => navigate('/')} className="mt-8 text-[9px] font-black uppercase text-navy-200 hover:text-navy-900 transition-colors">
+                  ← Return to Public Portal
+               </button>
             </div>
          </div>
       );
@@ -2770,10 +3168,13 @@ const AdminPage: React.FC<{ user: UserProfile | null }> = ({ user }) => {
                <div className="my-4 border-t border-navy-50"></div>
                <h4 className="text-[9px] font-black uppercase text-navy-200 tracking-[0.3em] px-6 mb-4">Registry & Data</h4>
                <AdminNavItem active={activeModule === 'users'} onClick={() => setActiveModule('users')} icon={<Users size={20} />} label="Member Registry" />
+               <AdminNavItem active={activeModule === 'namasmarana'} onClick={() => setActiveModule('namasmarana')} icon={<Mic size={20} />} label="Namasmarana" />
                <AdminNavItem active={activeModule === 'reflections'} onClick={() => setActiveModule('reflections')} icon={<Quote size={20} />} label="Reflection Queue" />
                <AdminNavItem active={activeModule === 'article_comments'} onClick={() => setActiveModule('article_comments')} icon={<MessageCircle size={20} />} label="Article Comments" />
+               <AdminNavItem active={activeModule === 'journal'} onClick={() => setActiveModule('journal')} icon={<BookOpen size={20} />} label="Journal Entries" />
                <AdminNavItem active={activeModule === 'sadhana'} onClick={() => setActiveModule('sadhana')} icon={<Activity size={20} />} label="Sadhana Analytics" />
                <AdminNavItem active={activeModule === 'bookclub_analytics'} onClick={() => setActiveModule('bookclub_analytics')} icon={<Trophy size={20} />} label="Book Club Analytics" />
+               <AdminNavItem active={activeModule === 'games'} onClick={() => setActiveModule('games')} icon={<Gamepad2 size={20} />} label="Games Manager" />
                <div className="my-4 border-t border-navy-50"></div>
                <h4 className="text-[9px] font-black uppercase text-navy-200 tracking-[0.3em] px-6 mb-4">System</h4>
                <AdminNavItem active={activeModule === 'leaderboard'} onClick={() => setActiveModule('leaderboard')} icon={<Target size={20} />} label="Leaderboard Control" />
@@ -2790,11 +3191,14 @@ const AdminPage: React.FC<{ user: UserProfile | null }> = ({ user }) => {
                {activeModule === 'branding' && <BrandingManager adminEmail={user?.email || 'admin'} />}
                {activeModule === 'bookclub_analytics' && <BookClubAnalytics />}
                {activeModule === 'users' && <UserRegistry adminEmail={user?.email || 'admin'} />}
+               {activeModule === 'namasmarana' && <NamasmaranaManager adminEmail={user?.email || 'admin'} />}
                {activeModule === 'reflections' && <ReflectionQueue adminEmail={user?.email || 'admin'} />}
                {activeModule === 'articles' && <ArticleManager adminEmail={user?.email || 'admin'} user={user} />}
                {activeModule === 'article_comments' && <ArticleCommentModeration adminEmail={user?.email || 'admin'} />}
+               {activeModule === 'journal' && <JournalManager adminEmail={user?.email || 'admin'} />}
                {activeModule === 'sadhana' && <SadhanaAnalytics />}
                {activeModule === 'leaderboard' && <LeaderboardManager adminEmail={user?.email || 'admin'} />}
+               {activeModule === 'games' && <GamesManager adminEmail={user?.email || 'admin'} />}
             </main>
          </div>
       </div>

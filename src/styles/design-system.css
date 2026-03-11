@@ -7,9 +7,9 @@
 /* ── Google Fonts ─────────────────────────────────────────── */
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,800;1,400;1,600;1,700&family=Poppins:wght@300;400;500;600;700;800&family=Open+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400;1,600&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400;1,600&family=Cinzel:wght@400;600;700&display=swap');
 
-/* ── FIX 1: ROOT CSS TOKENS ──────────────────────────────── */
+/* ── ROOT CSS TOKENS ─────────────────────────────────────── */
 :root {
-    /* Page Foundation */
+    /* ─── Page Foundation ───────────────────────────────────── */
     --bg: #FDFBF7;
     --surface-1: #FFFFFF;
     --surface-2: #F5F3E8;
@@ -18,51 +18,105 @@
     --text-muted: #555973;
     --border: #CCD5DE;
 
-    /* Brand Anchors */
-    --brand-navy: #002E5B;
-    --brand-purple: #7B2482;
-    --brand-gold: #D2AC47;
-    --secondary-colour-two: #D2AC47;
+    /* ─── GOLD  (Primary brand colour) ──────────────────────── */
+    --gold-light:  #D4B76E;
+    --gold-base:   #C9A961;
+    --gold-dark:   #B89344;
+    --gold-darker: #8F6B1F;
 
-    /* Signature Gradients */
-    --gold-gradient: linear-gradient(90deg, #D2AC47 5%, #F7EF8A 45%, #AE8625 85%);
-    --banner-gradient: linear-gradient(90deg, #002040 0%, #56195B 100%);
-    --hero-edge-strip: linear-gradient(135deg, #002E5B 0%, #7B2482 50%, #D2AC47 100%);
+    /* backwards-compat alias */
+    --brand-gold:          var(--gold-base);
+    --secondary-colour-two: var(--gold-base);
 
-    /* CTA & Premium Gradients */
-    --cta-navy: linear-gradient(135deg, #001224 0%, #002E5B 50%, #52718F 100%);
+    /* Gold gradients */
+    --gradient-gold: linear-gradient(135deg, var(--gold-light) 0%, var(--gold-base) 50%, var(--gold-dark) 100%);
+    --gradient-gold-vibrant: linear-gradient(135deg, #E0C27F 0%, var(--gold-light) 25%, var(--gold-base) 50%, var(--gold-dark) 75%, var(--gold-darker) 100%);
+    --gradient-gold-hover:   linear-gradient(135deg, #E0C27F 0%, var(--gold-light) 50%, var(--gold-base) 100%);
+
+    /* kept for legacy references */
+    --cta-gold:   var(--gradient-gold);
+    --gold-gradient: linear-gradient(90deg, var(--gold-base) 5%, var(--gold-light) 45%, var(--gold-dark) 85%);
+
+    /* ─── PURPLE  (Secondary – keep current) ────────────────── */
+    --purple-light:  #8B7FE8;
+    --purple-base:   #667eea;
+    --purple-medium: #764ba2;
+    --purple-dark:   #6A1B9A;
+    --purple-darker: #4A148C;
+    --brand-purple:  #7B2482;
+
+    --gradient-purple: linear-gradient(135deg, var(--purple-base) 0%, var(--purple-medium) 50%, var(--purple-dark) 100%);
+    --gradient-purple-signature: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     --cta-purple: linear-gradient(135deg, #310E34 0%, #7B2482 50%, #A56AAA 100%);
-    --cta-gold: linear-gradient(135deg, #745F27 0%, #D2AC47 50%, #F7EF8A 100%);
 
-    /* Feature Card Banner Gradients */
-    --card-namasmarana: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 50%, #5b21b6 100%);
-    --card-book-club: linear-gradient(135deg, #4ade80 0%, #22c55e 50%, #166534 100%);
-    --card-dashboard: linear-gradient(135deg, #f87171 0%, #ef4444 50%, #991b1b 100%);
-    --card-wisdom: linear-gradient(135deg, #002E5B 0%, #7B2482 50%, #D2AC47 100%);
-    --card-reflections: linear-gradient(135deg, #33004C 0%, #7B2482 30%, #B73FE0 60%, #F0DAF7 85%, #B73FE0 100%);
-    --card-play: linear-gradient(135deg, #E37222 0%, #FF8C00 25%, #D2AC47 50%, #FF8C00 75%, #E37222 100%);
-    --card-events: linear-gradient(135deg, #001224 0%, #002E5B 50%, #52718F 100%);
-    --card-likitha: linear-gradient(135deg, #A38C6E 0%, #D2B38A 100%);
+    /* ─── NAVY  (Tertiary / headers / dark BGs) ─────────────── */
+    --navy-light: #004080;
+    --navy-base:  #003366;
+    --navy-dark:  #001A33;
+    --navy-text:  #0A2540;
 
-    /* Game Level Card Gradients */
-    --level-green: linear-gradient(135deg, #22c55e, #15803d);
-    --level-blue: linear-gradient(135deg, #3b82f6, #1d4ed8);
-    --level-cyan: linear-gradient(135deg, #06b6d4, #0891b2);
+    /* backwards-compat alias */
+    --brand-navy: #003366;
+
+    --gradient-navy: linear-gradient(135deg, var(--navy-light) 0%, var(--navy-base) 50%, var(--navy-dark) 100%);
+    --gradient-navy-hover: linear-gradient(135deg, #0055AA 0%, var(--navy-light) 50%, var(--navy-base) 100%);
+    --cta-navy: var(--gradient-navy);
+
+    /* ─── Text on coloured surfaces ─────────────────────────── */
+    --text-on-gold:   #0A2540;
+    --text-on-purple: #FFFFFF;
+    --text-on-navy:   #FFFFFF;
+
+    /* ─── Signature Gradients (hero/banner) ─────────────────── */
+    --banner-gradient:  linear-gradient(90deg, var(--navy-dark) 0%, #56195B 100%);
+    --hero-edge-strip:  linear-gradient(135deg, var(--navy-base) 0%, #7B2482 50%, var(--gold-base) 100%);
+
+    /* ─── Hybrid gradients ───────────────────────────────────── */
+    --gradient-gold-purple: linear-gradient(135deg, var(--gold-light) 0%, var(--gold-base) 25%, var(--purple-base) 75%, var(--purple-medium) 100%);
+    --gradient-purple-gold: linear-gradient(135deg, var(--purple-base) 0%, var(--purple-medium) 25%, var(--gold-base) 75%, var(--gold-dark) 100%);
+
+    /* ─── Feature Card Banner Gradients ─────────────────────── */
+    --card-namasmarana:  linear-gradient(135deg, #a78bfa 0%, #8b5cf6 50%, #5b21b6 100%);
+    --card-book-club:    linear-gradient(135deg, #4ade80 0%, #22c55e 50%, #166534 100%);
+    --card-dashboard:    linear-gradient(135deg, #f87171 0%, #ef4444 50%, #991b1b 100%);
+    --card-wisdom:       linear-gradient(135deg, var(--navy-base) 0%, #7B2482 50%, var(--gold-base) 100%);
+    --card-reflections:  linear-gradient(135deg, #33004C 0%, #7B2482 30%, #B73FE0 60%, #F0DAF7 85%, #B73FE0 100%);
+    --card-play:         linear-gradient(135deg, #E37222 0%, #FF8C00 25%, var(--gold-base) 50%, #FF8C00 75%, #E37222 100%);
+    --card-events:       var(--gradient-navy);
+    --card-likitha:      linear-gradient(135deg, #A38C6E 0%, #D2B38A 100%);
+
+    /* ─── Game Level Gradients ───────────────────────────────── */
+    --level-green:  linear-gradient(135deg, #22c55e, #15803d);
+    --level-blue:   linear-gradient(135deg, #3b82f6, #1d4ed8);
+    --level-cyan:   linear-gradient(135deg, #06b6d4, #0891b2);
     --level-purple: linear-gradient(135deg, #a855f7, #7e22ce);
-    --level-amber: linear-gradient(135deg, #facc15, #f59e0b);
-    --level-pink: linear-gradient(135deg, #ec4899, #e11d48);
-    --level-teal: linear-gradient(135deg, #16a34a, #ca8a04);
-    --level-navy: linear-gradient(135deg, #2563eb, #1e40af);
+    --level-amber:  linear-gradient(135deg, #facc15, #f59e0b);
+    --level-pink:   linear-gradient(135deg, #ec4899, #e11d48);
+    --level-teal:   linear-gradient(135deg, #16a34a, #ca8a04);
+    --level-navy:   linear-gradient(135deg, #2563eb, #1e40af);
     --level-orange: linear-gradient(135deg, #f97316, #dc2626);
-    --level-gold: linear-gradient(135deg, #f59e0b, #d97706);
+    --level-gold:   var(--gradient-gold);
 
-    /* Shadows */
-    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12);
-    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.15);
-    --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.22);
-    --shadow-hero: 0 8px 40px rgba(0, 18, 36, 0.45), 0 2px 8px rgba(0, 46, 91, 0.3);
-    --shadow-card: 0 4px 20px rgba(0, 18, 36, 0.12), 0 1px 4px rgba(0, 0, 0, 0.08);
-    --shadow-card-hover: 0 12px 40px rgba(0, 18, 36, 0.22), 0 4px 12px rgba(0, 0, 0, 0.12);
+    /* ─── Semantic Shadows ───────────────────────────────────── */
+    --shadow-sm:          0 1px 3px rgba(0, 0, 0, 0.12);
+    --shadow-md:          0 4px 12px rgba(0, 0, 0, 0.15);
+    --shadow-lg:          0 10px 30px rgba(0, 0, 0, 0.22);
+    --shadow-hero:        0 8px 40px rgba(0, 18, 36, 0.45), 0 2px 8px rgba(0, 46, 91, 0.3);
+    --shadow-card:        0 4px 20px rgba(0, 18, 36, 0.12), 0 1px 4px rgba(0, 0, 0, 0.08);
+    --shadow-card-hover:  0 12px 40px rgba(0, 18, 36, 0.22), 0 4px 12px rgba(0, 0, 0, 0.12);
+    --shadow-gold:        0 4px 12px rgba(201, 169, 97, 0.35);
+    --shadow-gold-lg:     0 8px 24px rgba(201, 169, 97, 0.45);
+    --shadow-purple:      0 4px 12px rgba(118, 75, 162, 0.30);
+    --shadow-purple-lg:   0 8px 24px rgba(118, 75, 162, 0.40);
+    --shadow-navy:        0 4px 12px rgba(0, 51, 102, 0.30);
+    --shadow-navy-lg:     0 8px 24px rgba(0, 51, 102, 0.40);
+
+    /* ─── Transition Timings ─────────────────────────────────── */
+    --transition-fast:     0.15s ease;
+    --transition-base:     0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-slow:     0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    --ease-out-expo:       cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-in-out-back:    cubic-bezier(0.68, -0.55, 0.265, 1.55);
 }
 
 /* ── PAGE FOUNDATION ─────────────────────────────────────── */
@@ -143,7 +197,7 @@ header.site-header,
 nav.navbar,
 .navbar.site-header {
     background: var(--brand-navy) !important;
-    border-bottom: 1px solid rgba(210, 172, 71, 0.2);
+    border-bottom: 1px solid rgba(201, 169, 97, 0.25);
 }
 
 header.site-header .brand-text,
@@ -175,30 +229,44 @@ nav.navbar a:hover {
 
 /* Sign In button in header */
 .btn-sign-in {
-    background: var(--cta-gold) !important;
-    color: var(--text-primary) !important;
+    background: var(--gradient-gold) !important;
+    color: var(--text-on-gold) !important;
     border: none !important;
-    font-weight: 600;
+    font-weight: 700;
     padding: 10px 20px;
     border-radius: 1rem;
     cursor: pointer;
-    transition: opacity 150ms ease-out, transform 100ms ease-out;
+    box-shadow: var(--shadow-gold);
+    transition: background var(--transition-base), box-shadow var(--transition-base), transform var(--transition-fast);
 }
 
 .btn-sign-in:hover {
-    opacity: 0.9;
-    transform: scale(1.02);
+    background: var(--gradient-gold-hover) !important;
+    box-shadow: var(--shadow-gold-lg);
+    transform: translateY(-2px);
+}
+
+.btn-sign-in:active {
+    transform: scale(0.97);
 }
 
 /* Admin pill button in header */
 .btn-admin {
-    background: var(--brand-navy) !important;
-    color: #FFFFFF !important;
-    border: 2px solid rgba(210, 172, 71, 0.6) !important;
+    background: var(--gradient-navy) !important;
+    color: var(--text-on-navy) !important;
+    border: 1px solid rgba(201, 169, 97, 0.45) !important;
     border-radius: 0.75rem;
-    font-weight: 600;
+    font-weight: 700;
     font-size: 13px;
     padding: 8px 16px;
+    box-shadow: var(--shadow-navy);
+    transition: background var(--transition-base), box-shadow var(--transition-base), transform var(--transition-fast);
+}
+
+.btn-admin:hover {
+    background: var(--gradient-navy-hover) !important;
+    box-shadow: var(--shadow-navy-lg);
+    transform: translateY(-1px);
 }
 
 /* ── FIX 2c: SEARCH BAR ──────────────────────────────────── */
@@ -212,9 +280,9 @@ input[type="search"] {
 }
 
 input[type="search"]:focus {
-    border-color: var(--brand-gold) !important;
+    border-color: var(--gold-base) !important;
     outline: none;
-    box-shadow: 0 0 0 3px rgba(210, 172, 71, 0.2);
+    box-shadow: 0 0 0 3px rgba(201, 169, 97, 0.25);
 }
 
 input[type="search"]::placeholder {
@@ -417,17 +485,17 @@ input[type="search"]::placeholder {
 }
 
 .card-wisdom .feature-card__btn {
-    background: transparent;
-    color: #745F27;
-    border-color: var(--brand-gold);
+    background: var(--gradient-gold);
+    color: var(--text-on-gold);
+    border-color: var(--gold-base);
     font-weight: 700;
+    box-shadow: var(--shadow-gold);
 }
 
 .card-wisdom .feature-card__btn:hover {
-    background: var(--cta-gold);
-    color: var(--text-primary);
-    box-shadow: 0 4px 16px rgba(210, 172, 71, 0.35);
-    transform: translateY(-1px);
+    background: var(--gradient-gold-hover);
+    box-shadow: var(--shadow-gold-lg);
+    transform: translateY(-2px);
 }
 
 .card-reflections .feature-card__btn {
@@ -483,17 +551,20 @@ input[type="search"]::placeholder {
 }
 
 /* ── BUTTONS OUTSIDE CARDS ───────────────────────────────── */
+
+/* PRIMARY — Gold */
 .btn-primary,
 .btn-cta {
-    background: var(--cta-gold) !important;
-    color: var(--text-primary) !important;
+    background: var(--gradient-gold) !important;
+    color: var(--text-on-gold) !important;
     border: none !important;
     font-weight: 700;
     padding: 12px 28px;
     border-radius: 1rem;
     cursor: pointer;
     font-size: 14px;
-    transition: opacity 150ms ease, transform 100ms ease;
+    box-shadow: var(--shadow-gold);
+    transition: background var(--transition-base), box-shadow var(--transition-base), transform var(--transition-fast);
     text-decoration: none;
     display: inline-flex;
     align-items: center;
@@ -502,59 +573,153 @@ input[type="search"]::placeholder {
 
 .btn-primary:hover,
 .btn-cta:hover {
-    opacity: 0.88;
-    transform: scale(1.02);
+    background: var(--gradient-gold-hover) !important;
+    box-shadow: var(--shadow-gold-lg);
+    transform: translateY(-2px);
 }
 
 .btn-primary:active,
 .btn-cta:active {
-    transform: scale(0.97);
+    transform: scale(0.97) translateY(0);
+    box-shadow: var(--shadow-gold);
 }
 
+.btn-primary:focus-visible,
+.btn-cta:focus-visible {
+    outline: 2px solid var(--gold-base);
+    outline-offset: 3px;
+}
+
+/* SECONDARY — Navy */
 .btn-secondary,
 .btn-outline {
-    background: transparent !important;
-    color: #FFFFFF !important;
-    border: 2px solid var(--brand-gold) !important;
+    background: var(--gradient-navy) !important;
+    color: var(--text-on-navy) !important;
+    border: 1px solid rgba(201, 169, 97, 0.3) !important;
     font-weight: 600;
     padding: 12px 28px;
     border-radius: 1rem;
     cursor: pointer;
     font-size: 14px;
-    transition: background 200ms ease, box-shadow 200ms ease;
+    box-shadow: var(--shadow-navy);
+    transition: background var(--transition-base), box-shadow var(--transition-base), transform var(--transition-fast);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
 }
 
 .btn-secondary:hover,
 .btn-outline:hover {
-    background: #00274D !important;
-    box-shadow: 0 4px 16px rgba(0, 46, 91, 0.35);
+    background: var(--gradient-navy-hover) !important;
+    box-shadow: var(--shadow-navy-lg);
+    transform: translateY(-2px);
+    border-color: rgba(201, 169, 97, 0.5) !important;
+}
+
+.btn-secondary:active,
+.btn-outline:active {
+    transform: scale(0.97) translateY(0);
+}
+
+.btn-secondary:focus-visible,
+.btn-outline:focus-visible {
+    outline: 2px solid var(--gold-base);
+    outline-offset: 3px;
+}
+
+/* OUTLINE VARIANTS */
+.btn-outline-gold {
+    background: transparent !important;
+    color: var(--gold-base) !important;
+    border: 2px solid var(--gold-base) !important;
+    font-weight: 600;
+    padding: 10px 22px;
+    border-radius: 1rem;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background var(--transition-base), border-color var(--transition-base), transform var(--transition-fast);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+}
+
+.btn-outline-gold:hover {
+    background: rgba(201, 169, 97, 0.1) !important;
+    border-color: var(--gold-light) !important;
+    color: var(--gold-light) !important;
+    transform: translateY(-1px);
+}
+
+.btn-outline-gold:focus-visible {
+    outline: 2px solid var(--gold-base);
+    outline-offset: 3px;
+}
+
+.btn-outline-navy {
+    background: transparent !important;
+    color: var(--navy-base) !important;
+    border: 2px solid var(--navy-base) !important;
+    font-weight: 600;
+    padding: 10px 22px;
+    border-radius: 1rem;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background var(--transition-base), transform var(--transition-fast);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+}
+
+.btn-outline-navy:hover {
+    background: rgba(0, 51, 102, 0.08) !important;
+    transform: translateY(-1px);
 }
 
 /* ── FAB ─────────────────────────────────────────────────── */
 .fab {
-    background: var(--cta-gold) !important;
-    color: var(--text-primary) !important;
+    background: var(--gradient-gold) !important;
+    color: var(--text-on-gold) !important;
     width: 56px;
     height: 56px;
     border-radius: 50%;
     border: none;
-    box-shadow: 0 4px 16px rgba(0, 18, 36, 0.3);
+    box-shadow: var(--shadow-gold), 0 3px 8px rgba(0, 0, 0, 0.1);
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: transform 200ms ease, box-shadow 200ms ease;
+    transition: background var(--transition-base), box-shadow var(--transition-base), transform var(--ease-out-expo);
 }
 
 .fab:hover {
-    transform: scale(1.12);
-    box-shadow: 0 8px 24px rgba(0, 18, 36, 0.4);
+    background: var(--gradient-gold-hover) !important;
+    box-shadow: var(--shadow-gold-lg), 0 5px 12px rgba(0, 0, 0, 0.15);
+    transform: scale(1.15);
+}
+
+.fab:active {
+    transform: scale(0.95);
+    box-shadow: var(--shadow-gold);
+}
+
+.fab:focus-visible {
+    outline: 2px solid var(--gold-base);
+    outline-offset: 3px;
 }
 
 .fab.fab-home {
-    background: var(--brand-navy) !important;
-    color: #FFFFFF !important;
-    border: 2px solid rgba(210, 172, 71, 0.5) !important;
+    background: var(--gradient-navy) !important;
+    color: var(--text-on-navy) !important;
+    border: 2px solid rgba(201, 169, 97, 0.45) !important;
+    box-shadow: var(--shadow-navy);
+}
+
+.fab.fab-home:hover {
+    background: var(--gradient-navy-hover) !important;
+    box-shadow: var(--shadow-navy-lg);
 }
 
 /* ── NOTIFICATION BELL ───────────────────────────────────── */

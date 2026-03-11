@@ -62,15 +62,15 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ user, isAdmin, onLogo
         <div ref={dropdownRef} className="relative">
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="flex items-center gap-2 p-1 rounded-full hover:bg-neutral-50 transition-all"
+                className="flex items-center gap-2 p-1 rounded-full hover:bg-white/10 transition-all"
             >
                 <SaiAvatar gender={user.gender || 'male'} photoURL={user.photoURL} size={40} />
                 <div className="hidden lg:flex flex-col items-start bg-transparent ml-2">
-                    <span className="text-xs font-bold text-white leading-tight hover:text-gold-400 transition-colors">
+                    <span className="text-xs font-bold text-white leading-tight">
                         {user.name || 'Devotee'}
                     </span>
                     {isAdmin && (
-                        <span className="text-[8px] font-black uppercase tracking-wider text-purple-600">
+                        <span className="text-[8px] font-black uppercase tracking-wider text-purple-300">
                             Admin
                         </span>
                     )}
