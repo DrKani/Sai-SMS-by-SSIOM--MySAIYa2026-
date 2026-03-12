@@ -43,7 +43,7 @@ const EnhancedTickerBar: React.FC<EnhancedTickerBarProps> = ({
     const effectivelyPaused = isPaused || isHovered;
 
     return (
-        <div className="updates-banner sticky top-0 z-[60] h-10 bg-gradient-to-r from-navy-700 via-purple-700 to-purple-600 text-white flex items-center overflow-hidden group">
+        <div id="tour-ticker" className="updates-banner sticky top-0 z-[60] h-10 bg-gradient-to-r from-navy-700 via-purple-700 to-purple-600 text-white flex items-center overflow-hidden group">
             {/* Left Label with Pause/Play */}
             <div className="flex-shrink-0 bg-navy-900 px-4 h-full flex items-center z-10 gap-3">
                 <span className="font-bold text-[10px] uppercase tracking-widest">UPDATES</span>

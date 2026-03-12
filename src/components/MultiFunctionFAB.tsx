@@ -7,50 +7,63 @@ interface MultiFunctionFABProps {
     onScrollTop: () => void;
 }
 
+// Explicit hex colors for each action — prevents Tailwind JIT purging custom palette names
+const FAB_ACTIONS = [
+    {
+        icon: <Home size={20} strokeWidth={2.5} />,
+        label: 'Home',
+        link: '/',
+        bg: '#FFFFFF',
+        iconColor: '#0A2540',
+        border: '2px solid #002E5B',
+    },
+    {
+        icon: <LayoutDashboard size={20} strokeWidth={2.5} />,
+        label: 'Dashboard',
+        link: '/dashboard',
+        bg: '#9B59B6',
+        iconColor: '#FFFFFF',
+        border: 'none',
+    },
+    {
+        icon: <Calendar size={20} strokeWidth={2.5} />,
+        label: 'Events Viewer',
+        link: '/calendar',
+        bg: '#00B894',
+        iconColor: '#FFFFFF',
+        border: 'none',
+    },
+    {
+        icon: <Gamepad2 size={20} strokeWidth={2.5} />,
+        label: 'Play It',
+        link: '/games',
+        bg: '#FF6B6B',
+        iconColor: '#FFFFFF',
+        border: 'none',
+    },
+    {
+        icon: <Mic size={20} strokeWidth={2.5} />,
+        label: 'Namasmarana',
+        link: '/namasmarana',
+        bg: '#FF6B35',
+        iconColor: '#FFFFFF',
+        border: 'none',
+    },
+    {
+        icon: <Library size={20} strokeWidth={2.5} />,
+        label: "This Week's Reading",
+        link: '/book-club',
+        bg: '#8E24AA',
+        iconColor: '#FFFFFF',
+        border: 'none',
+    },
+];
+
 const MultiFunctionFAB: React.FC<MultiFunctionFABProps> = ({ showScrollTop, onScrollTop }) => {
     const [isExpanded, setIsExpanded] = useState(false);
 
-    const actions = [
-        {
-            icon: <Home size={20} strokeWidth={2.5} />,
-            label: 'Home',
-            link: '/',
-            color: 'bg-navy-900 hover:bg-navy-800',
-        },
-        {
-            icon: <LayoutDashboard size={20} strokeWidth={2.5} />,
-            label: 'Dashboard',
-            link: '/dashboard',
-            color: 'bg-purple-600 hover:bg-purple-700',
-        },
-        {
-            icon: <Calendar size={20} strokeWidth={2.5} />,
-            label: 'Events Viewer',
-            link: '/calendar',
-            color: 'bg-teal-600 hover:bg-teal-700',
-        },
-        {
-            icon: <Gamepad2 size={20} strokeWidth={2.5} />,
-            label: 'Play It',
-            link: '/games',
-            color: 'bg-gold-600 hover:bg-gold-700',
-        },
-        {
-            icon: <Mic size={20} strokeWidth={2.5} />,
-            label: 'Namasmarana',
-            link: '/namasmarana',
-            color: 'bg-orange-500 hover:bg-orange-600',
-        },
-        {
-            icon: <Library size={20} strokeWidth={2.5} />,
-            label: "This Week's Reading",
-            link: '/book-club',
-            color: 'bg-magenta-600 hover:bg-magenta-700',
-        },
-    ];
-
     return (
-        <div className="fixed bottom-10 right-10 z-[70] flex flex-col-reverse items-end gap-4">
+        <div id="tour-fab" className="fixed bottom-10 right-10 z-[70] flex flex-col-reverse items-end gap-4">
             {/* Scroll to Top FAB - only when scrolled */}
             {showScrollTop && (
                 <div className="relative group">
@@ -69,13 +82,16 @@ const MultiFunctionFAB: React.FC<MultiFunctionFABProps> = ({ showScrollTop, onSc
             {/* Expanded Action Buttons */}
             {isExpanded && (
                 <div className="flex flex-col-reverse items-end gap-3 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                    {actions.map((action, index) => (
+                    {FAB_ACTIONS.map((action, index) => (
                         <div key={index} className="relative group">
                             <Link
                                 to={action.link}
                                 onClick={() => setIsExpanded(false)}
-                                className={`w-14 h-14 ${action.color} text-white rounded-full shadow-xl flex items-center justify-center hover:scale-110 hover:ring-2 hover:ring-[#DAA520] hover:ring-offset-2 hover:ring-offset-white active:scale-95 transition-all`}
+                                className="w-14 h-14 rounded-full shadow-xl flex items-center justify-center hover:scale-110 hover:ring-2 hover:ring-[#D2AC47] hover:ring-offset-2 hover:ring-offset-white active:scale-95 transition-all"
                                 style={{
+                                    background: action.bg,
+                                    color: action.iconColor,
+                                    border: action.border,
                                     animationDelay: `${index * 50}ms`,
                                 }}
                             >
@@ -93,8 +109,7 @@ const MultiFunctionFAB: React.FC<MultiFunctionFABProps> = ({ showScrollTop, onSc
             <div className="relative group">
                 <button
                     onClick={() => setIsExpanded(!isExpanded)}
-                    className={`fab fab-add w-16 h-16 bg-gold-gradient rounded-full shadow-2xl flex items-center justify-center text-navy-900 border border-white/30 hover:scale-110 active:scale-95 transition-all ${isExpanded ? 'rotate-45' : ''
-                        }`}
+                    className={`fab fab-add w-16 h-16 bg-gold-gradient rounded-full shadow-2xl flex items-center justify-center text-navy-900 border border-white/30 hover:scale-110 active:scale-95 transition-all ${isExpanded ? 'rotate-45' : ''}`}
                     aria-label={isExpanded ? 'Close quick actions' : 'Open quick actions'}
                 >
                     {isExpanded ? (

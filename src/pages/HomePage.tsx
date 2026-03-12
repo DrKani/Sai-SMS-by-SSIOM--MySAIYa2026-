@@ -122,12 +122,25 @@ const HomePage: React.FC = () => {
               </Link>
             </div>
           )}
+
+          {/* Replay Walkthrough button — visible only to signed-in non-guest users */}
+          {user && !user.isGuest && (
+            <div className="mt-6">
+              <button
+                onClick={() => window.dispatchEvent(new CustomEvent('sms:replayTour'))}
+                className="inline-flex items-center gap-2 px-5 py-2 rounded-full border border-gold-500/50 text-gold-400 text-xs font-bold uppercase tracking-widest hover:bg-gold-500/10 transition-all"
+                title="Replay the app walkthrough tour"
+              >
+                <span>🗺️</span> Replay Walkthrough
+              </button>
+            </div>
+          )}
         </div>
       </section>
 
       {/* This Week's Wisdom */}
       {activeBookWeek && (
-        <section className="w-full">
+        <section id="tour-weekly-wisdom" className="w-full">
           <Link
             to={`/book-club/${activeBookWeek.weekId}`}
             className="block bg-navy-900 rounded-[2.5rem] shadow-2xl border-4 border-gold-500 overflow-hidden group hover:scale-[1.01] transition-all duration-500"
@@ -215,7 +228,9 @@ const HomePage: React.FC = () => {
       </div>
 
       {/* Unified Offering Tile */}
-      <UnifiedOfferingTile globalStats={globalStats} user={user} />
+      <div id="tour-collective-prayer">
+        <UnifiedOfferingTile globalStats={globalStats} user={user} />
+      </div>
 
       {/* Devotee Reflections */}
       {approvedReflections.length > 0 && (

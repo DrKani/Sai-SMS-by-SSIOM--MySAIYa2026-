@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation, us
 import { onAuthStateChanged, signOut, sendEmailVerification, User as FirebaseUser } from 'firebase/auth';
 import { doc, getDoc, updateDoc, onSnapshot, collection, query, where, orderBy, writeBatch } from 'firebase/firestore';
 import { auth, db } from './lib/firebase';
-import TutorialOverlay, { TutorialStep } from './components/TutorialOverlay';
+import OnboardingTour from './components/OnboardingTour';
 import {
   Menu, X, Bell, LogOut, ChevronRight, Search,
   MapPin, ShieldCheck, UserCircle,
@@ -111,13 +111,6 @@ const NavigationListener = ({ onNavigate }: { onNavigate: () => void }) => {
   return null;
 };
 
-const APP_TUTORIAL_STEPS: TutorialStep[] = [
-  { target: 'center', isWelcome: true, title: 'Welcome to Sai SMS', text: 'Your digital home for the 2026 National Sadhana Journey. Let us show you around in 4 quick steps.', primaryLabel: 'Begin Tour 🙏' },
-  { target: 'center', isWelcome: true, title: 'Namasmarana — Offer Chants', text: 'Tap "Namasmarana" from the menu to log your daily Gayathri or Om Sai Ram chants. Every chant contributes to the national collective offering to Swami.' },
-  { target: 'center', isWelcome: true, title: 'Sai Lit Club — Weekly Reading', text: 'Every week a new chapter is released for collective study. Read, reflect, and take a quiz to earn badges. Join the national reading journey!' },
-  { target: 'center', isWelcome: true, title: 'Your Personal Dashboard', text: 'Track your personal chant totals, reading streaks, spiritual milestones and badges all in one place. Your sadhana, beautifully visualised.' },
-  { target: 'center', isWelcome: true, title: 'Sai SMS Games — Play & Learn', text: 'Engage your mind with Quotescapes, Sai SMS Parikshya quizzes, Word Search, and Sacred Crossword. Life is a game — play it!', primaryLabel: 'Begin My Journey 🕉️' },
-];
 
 const BottomNav: React.FC<{ user: UserProfile | null }> = ({ user }) => {
   const location = useLocation();
@@ -243,7 +236,7 @@ const Layout: React.FC = () => {
 
     // CRITICAL: If Firebase onAuthStateChanged never fires (SDK crash / network down),
     // unblock the UI after 3 seconds so users can browse as guest.
-    const authTimeout = setTimeout(() => setIsAuthChecking(false), 3000);
+    const authTimeout = setTimeout(() => setIsAuthChecking(false), 1200);
 
     const refreshData = () => {
       const brand = localStorage.getItem('sms_branding_config');
@@ -256,8 +249,11 @@ const Layout: React.FC = () => {
 
     refreshData();
     const handleScroll = () => setShowScrollTop(window.scrollY > 400);
+    // Replay tour when dispatched from the Home page Replay button
+    const handleReplayTour = () => setShowAppTutorial(true);
     window.addEventListener('scroll', handleScroll);
     window.addEventListener('storage', refreshData);
+    window.addEventListener('sms:replayTour', handleReplayTour);
 
     const unsubAnnouncements = onSnapshot(
       query(collection(db, 'announcements'), orderBy('timestamp', 'desc')),
@@ -298,6 +294,7 @@ const Layout: React.FC = () => {
       clearTimeout(authTimeout);
       window.removeEventListener('scroll', handleScroll);
       window.removeEventListener('storage', refreshData);
+      window.removeEventListener('sms:replayTour', handleReplayTour);
     };
   }, [user?.uid, user?.isGuest]);
 
@@ -409,17 +406,22 @@ const Layout: React.FC = () => {
               <span className="brand-subtitle text-[10px] text-navy-500 font-medium tracking-wide">{APP_CONFIG.TAGLINE}</span>
             </div>
           </Link>
-          <EnhancedSearchBar searchQuery={searchQuery} setSearchQuery={setSearchQuery} isSearchOpen={isSearchOpen} setIsSearchOpen={setIsSearchOpen} searchResults={searchResults} onSelect={(link) => { navigate(link); setIsSearchOpen(false); setSearchQuery(""); }} placeholder="Search resources..." />
+          <div id="tour-search" className="flex-grow max-w-xl relative">
+            <EnhancedSearchBar searchQuery={searchQuery} setSearchQuery={setSearchQuery} isSearchOpen={isSearchOpen} setIsSearchOpen={setIsSearchOpen} searchResults={searchResults} onSelect={(link) => { navigate(link); setIsSearchOpen(false); setSearchQuery(""); }} placeholder="Search resources..." />
+          </div>
           <div className="flex items-center gap-2 lg:gap-4 shrink-0">
             <NotificationBell unreadCount={unreadCount} onClick={() => setIsNotifOpen(true)} />
             {isAdmin && <Link to="/admin" className="btn-admin hidden lg:flex items-center gap-2"><ShieldCheck size={14} /> Admin</Link>}
-            <ProfileDropdown user={user} isAdmin={isAdmin} onLogout={() => setShowLogoutConfirm(true)} />
+            <div id="tour-avatar">
+              <ProfileDropdown user={user} isAdmin={isAdmin} onLogout={() => setShowLogoutConfirm(true)} />
+            </div>
             <button
+              id="tour-hamburger"
               onClick={() => setIsMenuOpen(true)}
               title="Menu"
-              className={`hamburger-btn group p-2 min-h-[44px] min-w-[44px] text-white transition-colors flex items-center justify-center rounded-xl hover:bg-white/5 ${isMenuOpen ? 'open' : ''}`}
+              className={`hamburger-btn group p-2 min-h-[44px] min-w-[44px] transition-all flex items-center justify-center rounded-xl hover:bg-white/10 hover:ring-2 hover:ring-[#D2AC47]/70 hover:ring-offset-1 hover:ring-offset-transparent ${isMenuOpen ? 'open ring-2 ring-[#D2AC47] bg-white/10' : ''}`}
             >
-              <Menu size={28} className="group-hover:[stroke:url(#goldGradient)] group-[.open]:[stroke:url(#goldGradient)] transition-all duration-300" />
+              <Menu size={28} className="text-white group-hover:[stroke:url(#goldGradient)] group-[.open]:[stroke:url(#goldGradient)] transition-all duration-300" />
               <span className="sr-only">Menu</span>
             </button>
           </div>
@@ -500,12 +502,10 @@ const Layout: React.FC = () => {
         </div>
       )}
       {showAppTutorial && (
-        <TutorialOverlay
-          steps={APP_TUTORIAL_STEPS}
-          isVisible={showAppTutorial}
+        <OnboardingTour
+          userName={user?.name}
           onComplete={() => { setShowAppTutorial(false); markAppTutorialDone(); }}
           onSkip={() => { setShowAppTutorial(false); markAppTutorialDone(); }}
-          storageKey="sms_app_onboarding"
         />
       )}
       <BottomNav user={user} />
