@@ -428,7 +428,8 @@ const MegaMenu: React.FC<MegaMenuProps> = ({
   const MobileDrawer = () => (
     <div
       className={`mega-drawer ${isOpen ? 'mega-drawer--open' : ''}`}
-      role="navigation"
+      role="dialog"
+      aria-modal="true"
       aria-label="Main navigation"
       aria-hidden={!isOpen}
       ref={menuRef}

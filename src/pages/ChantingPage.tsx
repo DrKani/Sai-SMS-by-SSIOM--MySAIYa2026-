@@ -4,8 +4,9 @@ import { Minus, Plus, Send, CheckCircle2, Sparkles, Lock, Check, UserPlus, X, Al
 import { DEFAULT_SITE_CONTENT } from '../constants';
 import { SiteContent } from '../types';
 import { db } from '../lib/firebase';
-import { doc, getDoc, setDoc, collection, increment as firebaseIncrement, query, where, getDocs, limit } from 'firebase/firestore';
-import { recordSadhanaOffering, toMantraType } from '../lib/nationalStats';
+import { collection, getDocs, limit, query, where } from 'firebase/firestore';
+import { DEFAULT_SITE_CONFIG, subscribeToSiteConfig } from '../services/siteConfigService';
+import { findDuplicateSubmission, submitSadhanaOffering } from '../services/sadhanaService';
 
 const AvatarOption = ({ gender, selected, onClick }: { gender: 'male' | 'female', selected: boolean, onClick: () => void }) => (
   <button type="button" onClick={onClick} className={`group relative flex flex-col items-center gap-2 transition-all ${selected ? 'scale-110' : 'opacity-40 grayscale hover:opacity-100 hover:grayscale-0'}`}>
@@ -31,7 +32,7 @@ const ChantingPage: React.FC = () => {
   const [formData, setFormData] = useState({ count: 108 });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionError, setSubmissionError] = useState<string | null>(null);
-  const [siteContent, setSiteContent] = useState<SiteContent>(DEFAULT_SITE_CONTENT);
+  const [siteContent, setSiteContent] = useState<SiteContent>(DEFAULT_SITE_CONFIG.siteContent);
 
   // Likitha Japam State
   const [likithaText, setLikithaText] = useState('');
@@ -43,9 +44,10 @@ const ChantingPage: React.FC = () => {
   useEffect(() => {
     const saved = localStorage.getItem('sms_user');
     if (saved) setUser(JSON.parse(saved));
-
-    const content = localStorage.getItem('sms_site_content');
-    if (content) setSiteContent(JSON.parse(content));
+    const unsubscribe = subscribeToSiteConfig((config) => {
+      setSiteContent(config.siteContent);
+    });
+    return () => unsubscribe();
   }, []);
 
   const increment = () => setFormData({ count: formData.count + 1 });
@@ -78,98 +80,35 @@ const ChantingPage: React.FC = () => {
       return;
     }
 
-    // 1. Update National Stats in Firestore (with mantra type and centre)
-    try {
-      const realChantCount = type === 'likitha' ? (value * 11) : value;
-      const mantraType = toMantraType(type);
-      const centre = user.centre || 'Unknown';
-      await recordSadhanaOffering(user.uid, user.state || 'Other', realChantCount, mantraType, centre);
-    } catch (e) {
-      console.warn("National stats sync failed:", e);
-    }
-
-    // 2. Update Personal Stats in LocalStorage
+    // Keep local fallbacks in sync for existing dashboard and briefcase flows.
     const userStatsKey = `sms_stats_${user.uid}`;
     const userStats = JSON.parse(localStorage.getItem(userStatsKey) || '{"gayathri":0, "saiGayathri":0, "likitha":0}');
     userStats[type] += value;
     localStorage.setItem(userStatsKey, JSON.stringify(userStats));
+    await submitSadhanaOffering({ user, type, amount: value });
 
-    // 3. Sync to Personal Firestore Doc & Record for Badge/Leaderboard
-    try {
-      const userRef = doc(db, 'users', user.uid);
-      // Streak Logic
-      const now = new Date();
-      // Ensure we use local dates for accuracy (e.g. Asia/Kuala_Lumpur if that's the timezone, but here we just safely strip time)
-      const todayStr = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
-      const lastActivityStr = user.lastActivity
-        ? new Date(new Date(user.lastActivity).getTime() - (new Date(user.lastActivity).getTimezoneOffset() * 60000)).toISOString().split('T')[0]
-        : '';
+    // Check for milestone badges after the shared write succeeds.
+    const now = new Date();
+    const nextStreak = user.lastActivity ? ((user.streak || 0) + 1) : Math.max(user.streak || 0, 1);
+    const badges = JSON.parse(localStorage.getItem('sms_badges') || '[]');
+    const badgeThresholds = [
+      { days: 3, id: 'streak_3', title: '3-Day Streak', icon: '🔥', earnedAt: now.toISOString() },
+      { days: 7, id: 'streak_7', title: '7-Day Streak', icon: '🌟', earnedAt: now.toISOString() },
+      { days: 21, id: 'streak_21', title: '21-Day Habit', icon: '🏆', earnedAt: now.toISOString() },
+      { days: 30, id: 'streak_30', title: '30-Day Devotee', icon: '👑', earnedAt: now.toISOString() }
+    ];
 
-      let streakUpdate = {};
-      if (lastActivityStr !== todayStr) {
-        if (lastActivityStr) {
-          const todayDate = new Date(todayStr);
-          const lastDate = new Date(lastActivityStr);
-          const diffDays = Math.round((todayDate.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
-
-          if (diffDays === 1) {
-            streakUpdate = { streak: (user.streak || 0) + 1 };
-          } else if (diffDays > 1) {
-            streakUpdate = { streak: 1 };
-          }
-        } else {
-          // First time
-          streakUpdate = { streak: 1 };
-        }
+    const nextBadges = [...badges];
+    let newBadgeWon = false;
+    badgeThresholds.forEach((badge) => {
+      if (nextStreak >= badge.days && !nextBadges.find((existing: any) => existing.id === badge.id)) {
+        nextBadges.push(badge);
+        newBadgeWon = true;
       }
-
-      // Check for milestone badges
-      const currentStreak = (streakUpdate as any).streak || user.streak || 0;
-      const badges = JSON.parse(localStorage.getItem('sms_badges') || '[]');
-      const badgeThresholds = [
-        { days: 3, id: 'streak_3', title: '3-Day Streak', icon: '🔥', earnedAt: now.toISOString() },
-        { days: 7, id: 'streak_7', title: '7-Day Streak', icon: '🌟', earnedAt: now.toISOString() },
-        { days: 21, id: 'streak_21', title: '21-Day Habit', icon: '🏆', earnedAt: now.toISOString() },
-        { days: 30, id: 'streak_30', title: '30-Day Devotee', icon: '👑', earnedAt: now.toISOString() }
-      ];
-
-      let newBadgeWon = false;
-      badgeThresholds.forEach(b => {
-        if (currentStreak >= b.days && !badges.find((existing: any) => existing.id === b.id)) {
-          badges.push(b);
-          newBadgeWon = true;
-        }
-      });
-      if (newBadgeWon) {
-        localStorage.setItem('sms_badges', JSON.stringify(badges));
-        window.dispatchEvent(new Event('storage'));
-      }
-
-      await setDoc(userRef, {
-        stats: {
-          [type]: firebaseIncrement(value)
-        },
-        lastActivity: now.toISOString(),
-        ...streakUpdate
-      }, { merge: true });
-
-      // SEC-02, NAMA-02: Record day-level aggregated submission for leaderboard rollups
-      const dateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD
-      const dailyRef = doc(db, 'sadhanaDaily', `${user.uid}-${dateStr}`);
-
-      await setDoc(dailyRef, {
-        uid: user.uid,
-        userName: user.name,
-        state: user.state || 'Other',
-        centre: user.centre || 'SSIOM',
-        type: type, // Keeps track of last activity type
-        count: firebaseIncrement(realChantCount),
-        timestamp: new Date().toISOString(),
-        date: dateStr,
-        publicLeaderboard: user.publicLeaderboard ?? true
-      }, { merge: true });
-    } catch (e) {
-      console.error("Personal Firestore sync failed:", e);
+    });
+    if (newBadgeWon) {
+      localStorage.setItem('sms_badges', JSON.stringify(nextBadges));
+      window.dispatchEvent(new Event('storage'));
     }
 
     window.dispatchEvent(new Event('storage'));
@@ -207,16 +146,13 @@ const ChantingPage: React.FC = () => {
     if (user && navigator.onLine) {
       try {
         const todayISO = new Date().toISOString().split('T')[0];
-        const q = query(
-          collection(db, 'sadhanaDaily'),
-          where('uid', '==', user.uid),
-          where('type', '==', type),
-          where('count', '==', formData.count),
-          where('dateStr', '==', todayISO),
-          limit(1)
-        );
-        const dupSnap = await getDocs(q);
-        if (!dupSnap.empty) {
+        const duplicate = await findDuplicateSubmission({
+          userId: user.uid,
+          type,
+          count: formData.count,
+          date: todayISO
+        });
+        if (duplicate.exists) {
           const confirmSubmit = window.confirm(`You already submitted an offering of ${formData.count} ${chantingType} chants today. Are you sure you want to submit this again?`);
           if (!confirmSubmit) {
             setIsSubmitting(false);
@@ -284,16 +220,13 @@ const ChantingPage: React.FC = () => {
     if (user && navigator.onLine) {
       try {
         const todayISO = new Date().toISOString().split('T')[0];
-        const q = query(
-          collection(db, 'sadhanaDaily'),
-          where('uid', '==', user.uid),
-          where('type', '==', 'likitha'),
-          where('count', '==', likithaUnitsToSubmit * 11),
-          where('dateStr', '==', todayISO),
-          limit(1)
-        );
-        const dupSnap = await getDocs(q);
-        if (!dupSnap.empty) {
+        const duplicate = await findDuplicateSubmission({
+          userId: user.uid,
+          type: 'likitha',
+          count: likithaUnitsToSubmit * 11,
+          date: todayISO
+        });
+        if (duplicate.exists) {
           const confirmSubmit = window.confirm(`You already submitted an offering of ${likithaUnitsToSubmit * 11} Likitha Japam chants today. Are you sure you want to submit this again?`);
           if (!confirmSubmit) {
             setIsSubmitting(false);

@@ -7,7 +7,8 @@ import {
   Send, PenTool, SortAsc, SortDesc, BookMarked, BrainCircuit, Loader2
 } from 'lucide-react';
 import { UserProfile, JournalEntry, Bookmark } from '../types';
-import { getAIClient, MODELS } from '../lib/ai';
+import { getJournalEncouragement } from '../lib/ai';
+import { addJournalEntry, deleteJournalEntry, subscribeToUserJournalEntries } from '../services/journalService';
 
 const CATEGORIES = ['All', 'Gratitude', 'Prayer', 'Lesson', 'General'] as const;
 
@@ -37,33 +38,29 @@ const JournalPage: React.FC = () => {
     if (savedUser) {
       const u = JSON.parse(savedUser);
       setUser(u);
-      const savedEntries = localStorage.getItem(`sms_journal_${u.uid}`);
-      if (savedEntries) setEntries(JSON.parse(savedEntries));
-
       const savedBookmarks = localStorage.getItem(`sms_bookmarks_${u.uid}`);
       if (savedBookmarks) setBookmarks(JSON.parse(savedBookmarks));
     }
   }, []);
 
-  const saveToStorage = (updatedEntries: JournalEntry[]) => {
-    if (user) {
-      localStorage.setItem(`sms_journal_${user.uid}`, JSON.stringify(updatedEntries));
-    }
-  };
+  useEffect(() => {
+    if (!user?.uid) return;
+    return subscribeToUserJournalEntries(user.uid, (nextEntries) => {
+      setEntries(nextEntries);
+    }, (error) => {
+      console.error('Failed to sync journal entries', error);
+    });
+  }, [user?.uid]);
 
   const getAIEncouragement = async (content: string) => {
     if (!content || content.length < 10) return;
     setIsAnalyzing(true);
     try {
-      const ai = getAIClient();
-      const response = await ai.models.generateContent({
-        model: MODELS.text,
-        contents: `Provide a short, 2-sentence spiritual encouragement based on this journal entry: "${content}". 
-                   Tone should be humble, loving, and inspired by Sathya Sai Baba's teachings on Love and Seva.`,
-      });
-      setAiInsight(response.text || "Your path is blessed. Continue your sadhana with love.");
+      const insight = await getJournalEncouragement(content);
+      setAiInsight(insight || "Your path is blessed. Continue your sadhana with love.");
     } catch (error) {
       console.error("AI Insight Error:", error);
+      setAiInsight("Your reflection has value. Continue with patience, love, and steady remembrance.");
     } finally {
       setIsAnalyzing(false);
     }
@@ -72,12 +69,9 @@ const JournalPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleAdd = async () => {
-    if (!newEntry.title || !newEntry.content) return;
+    if (!user || !newEntry.title || !newEntry.content) return;
     setIsSubmitting(true);
     try {
-      // Simulate network wait for better UX
-      await new Promise(resolve => setTimeout(resolve, 500));
-
       const entry: JournalEntry = {
         id: Date.now().toString(),
         title: newEntry.title,
@@ -86,9 +80,13 @@ const JournalPage: React.FC = () => {
         entryDate: newEntry.entryDate,
         timestamp: new Date().toISOString()
       };
-      const updated = [entry, ...entries];
-      setEntries(updated);
-      saveToStorage(updated);
+      await addJournalEntry({
+        ...entry,
+        uid: user.uid,
+        userName: user.name,
+        visibility: 'private',
+        isShared: false
+      });
       setNewEntry({
         title: '',
         content: '',
@@ -104,9 +102,9 @@ const JournalPage: React.FC = () => {
 
   const handleDelete = (id: string) => {
     if (window.confirm("Are you sure you want to remove this reflection?")) {
-      const updated = entries.filter(e => e.id !== id);
-      setEntries(updated);
-      saveToStorage(updated);
+      deleteJournalEntry(id).catch((error) => {
+        console.error('Failed to delete journal entry', error);
+      });
     }
   };
 

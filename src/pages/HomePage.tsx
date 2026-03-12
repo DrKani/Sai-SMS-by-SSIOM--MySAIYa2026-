@@ -11,11 +11,15 @@ import QuoteSlider from '../components/QuoteSlider';
 import SaiAvatar from '../components/SaiAvatar';
 import UnifiedOfferingTile from '../components/UnifiedOfferingTile';
 import { subscribeToNationalStats, NationalStats } from '../lib/nationalStats';
+import { subscribeToApprovedReflections } from '../services/reflectionService';
+import { DEFAULT_SITE_CONFIG, subscribeToSiteConfig } from '../services/siteConfigService';
+import { STUDY_PLAN_CACHE_KEY, getCachedStudyPlanOverrides } from '../lib/bookClub';
 
 const FeatureCard: React.FC<{
+  id?: string;
   to: string; icon: React.ReactNode; label: string; title: string; description: string; cardClass: string; btnText: string;
-}> = ({ to, icon, label, title, description, cardClass, btnText }) => (
-  <Link to={to} className={`feature-card ${cardClass}`}>
+}> = ({ id, to, icon, label, title, description, cardClass, btnText }) => (
+  <Link id={id} to={to} className={`feature-card ${cardClass}`}>
     <div className="feature-card__banner">
       <div className="feature-card__banner-icon">
         {icon}
@@ -35,27 +39,22 @@ const FeatureCard: React.FC<{
 // ── Main Component ───────────────────────────────────────────────────────────
 
 const HomePage: React.FC = () => {
-  // All state initialised synchronously from localStorage — zero loading gates
-  const [siteContent, setSiteContent] = useState<SiteContent>(() => {
-    try {
-      const stored = localStorage.getItem('sms_site_content');
-      return stored ? JSON.parse(stored) : DEFAULT_SITE_CONTENT;
-    } catch { return DEFAULT_SITE_CONTENT; }
-  });
-
-  const [approvedReflections, setApprovedReflections] = useState<Reflection[]>(() => {
-    try {
-      const all: Reflection[] = JSON.parse(localStorage.getItem('sms_reflections_queue') || '[]');
-      return all.filter(r => r.status === 'approved').slice(0, 3);
-    } catch { return []; }
-  });
-
-  const [user] = useState<UserProfile | null>(() => {
+  const getCachedUser = () => {
     try {
       const saved = localStorage.getItem('sms_user');
       return saved ? JSON.parse(saved) : null;
-    } catch { return null; }
-  });
+    } catch {
+      return null;
+    }
+  };
+
+  // All state initialised synchronously from localStorage — zero loading gates
+  const [siteContent, setSiteContent] = useState<SiteContent>(DEFAULT_SITE_CONFIG.siteContent);
+
+  const [approvedReflections, setApprovedReflections] = useState<Reflection[]>([]);
+
+  const [user, setUser] = useState<UserProfile | null>(() => getCachedUser());
+  const [bookClubWeeks, setBookClubWeeks] = useState<BookClubWeek[]>(() => getCachedStudyPlanOverrides());
 
   // Firebase-dependent state — loaded after render, never blocks UI
   const [globalStats, setGlobalStats] = useState<NationalStats | null>(null);
@@ -64,9 +63,8 @@ const HomePage: React.FC = () => {
   const activeBookWeek = useMemo<BookClubWeek | null>(() => {
     try {
       const now = new Date();
-      const dynamic: BookClubWeek[] = JSON.parse(localStorage.getItem('sms_bookclub_weeks') || '[]');
       const all = [...ANNUAL_STUDY_PLAN];
-      dynamic.forEach(dw => {
+      bookClubWeeks.forEach(dw => {
         const idx = all.findIndex(a => a.weekId === dw.weekId);
         if (idx >= 0) all[idx] = dw; else all.push(dw);
       });
@@ -75,25 +73,38 @@ const HomePage: React.FC = () => {
         .sort((a, b) => b.weekId.localeCompare(a.weekId));
       return past.length > 0 ? past[0] : null;
     } catch { return null; }
-  }, []);
+  }, [bookClubWeeks]);
 
   // Non-blocking effects — Firebase data loaded progressively after first paint
   useEffect(() => {
-    // Refresh site content
-    const stored = localStorage.getItem('sms_site_content');
-    if (stored) {
-      try { setSiteContent(JSON.parse(stored)); } catch { }
-    }
-
     // Subscribe to live stats — errors are handled inside subscribeToNationalStats
     let cancelled = false;
-    const unsubscribe = subscribeToNationalStats(stats => {
+    const unsubscribeConfig = subscribeToSiteConfig((config) => {
+      if (!cancelled) setSiteContent(config.siteContent);
+    });
+    const unsubscribeStats = subscribeToNationalStats(stats => {
       if (!cancelled) setGlobalStats(stats);
     });
+    const unsubscribeReflections = subscribeToApprovedReflections((reflections) => {
+      if (!cancelled) setApprovedReflections(reflections);
+    });
+    const handleStorage = (event: StorageEvent) => {
+      if (!event.key || event.key === 'sms_user') {
+        setUser(getCachedUser());
+      }
+
+      if (!event.key || event.key === STUDY_PLAN_CACHE_KEY) {
+        setBookClubWeeks(getCachedStudyPlanOverrides());
+      }
+    };
+    window.addEventListener('storage', handleStorage);
 
     return () => {
       cancelled = true;
-      unsubscribe();
+      unsubscribeConfig();
+      unsubscribeStats();
+      unsubscribeReflections();
+      window.removeEventListener('storage', handleStorage);
     };
   }, []);
 
@@ -172,6 +183,7 @@ const HomePage: React.FC = () => {
       {/* Feature Navigation Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
         <FeatureCard
+          id="tour-namasmarana"
           to="/namasmarana"
           icon={<Mic size={24} color="white" />}
           label="Mantra Count"
@@ -181,6 +193,7 @@ const HomePage: React.FC = () => {
           btnText="Log Sadhana"
         />
         <FeatureCard
+          id="tour-book-club"
           to="/book-club"
           icon={<Library size={24} color="white" />}
           label="Weekly Reading"
@@ -190,6 +203,7 @@ const HomePage: React.FC = () => {
           btnText="Read Now"
         />
         <FeatureCard
+          id="tour-dashboard-card"
           to="/dashboard"
           icon={<Target size={24} color="white" />}
           label="Progress Tracker"

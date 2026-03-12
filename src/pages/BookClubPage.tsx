@@ -10,10 +10,12 @@ import {
 import { BookClubWeek, UserProfile, QuizSubmission, UserBriefcaseItem, Reflection } from '../types';
 import { ToastContainer, useToast } from '../components/Toast';
 import BriefcaseDrawer from '../components/BriefcaseDrawer';
-import { ANNUAL_STUDY_PLAN } from '../constants';
 import { useParams, useNavigate } from 'react-router-dom';
-import { collection, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, getDocs, addDoc, serverTimestamp, setDoc, doc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { addJournalEntry } from '../services/journalService';
+import { createReflection } from '../services/reflectionService';
+import { buildStudyPlanBaseline, fetchStudyPlanOverrides } from '../lib/bookClub';
 
 
 // --- SUB-COMPONENTS ---
@@ -258,73 +260,30 @@ const BookClubPage: React.FC = () => {
   // --- Firestore-backed study plan ---
   // We render the ANNUAL_STUDY_PLAN baseline instantly, then merge Firestore overrides.
 
-  // Ensure all array fields are defined after Firestore merge to prevent .map() crashes
-  const sanitizeWeek = (w: any): BookClubWeek => ({
-    ...w,
-    questions: Array.isArray(w.questions) ? w.questions : [],
-    learningOutcomes: Array.isArray(w.learningOutcomes) ? w.learningOutcomes : [],
-    reflectionPrompts: Array.isArray(w.reflectionPrompts) ? w.reflectionPrompts : [],
-  });
-
-  const buildBaseline = (): BookClubWeek[] => {
-    const saved = localStorage.getItem('sms_bookclub_weeks');
-    const dynamicWeeks: any[] = saved ? JSON.parse(saved) : [];
-    const merged = ANNUAL_STUDY_PLAN.map(w => {
-      const dyn = dynamicWeeks.find((dw: any) => dw.weekId === w.weekId);
-      return sanitizeWeek(dyn ? { ...w, ...dyn } : w);
-    });
-    dynamicWeeks.forEach((dw: any) => {
-      if (!merged.find(w => w.weekId === dw.weekId)) merged.push(sanitizeWeek(dw));
-    });
-    return merged.sort((a, b) => a.weekId.localeCompare(b.weekId));
-  };
-
-  const [studyPlan, setStudyPlan] = useState<BookClubWeek[]>(buildBaseline);
+  const [studyPlan, setStudyPlan] = useState<BookClubWeek[]>(() => buildStudyPlanBaseline());
   const [isPlanLoading, setIsPlanLoading] = useState(true);
 
   // Fetch from Firestore once; merge over the baseline.
   // Uses a localStorage cache (4-hour TTL) to avoid repeated getDocs reads.
   useEffect(() => {
-    const CACHE_KEY = 'sms_bookclub_fs_cache';
-    const CACHE_TTL = 4 * 60 * 60 * 1000; // 4 hours
-
     const applyFsMap = (fsMap: Record<string, any>) => {
       setStudyPlan(prev => {
         const merged = prev.map(w => {
           const fs = fsMap[w.weekId];
-          return sanitizeWeek(fs ? { ...w, ...fs } : w);
+          return fs ? { ...w, ...fs } : w;
         });
         Object.values(fsMap).forEach((fw: any) => {
-          if (!merged.find(w => w.weekId === fw.weekId)) merged.push(sanitizeWeek(fw));
+          if (!merged.find(w => w.weekId === fw.weekId)) merged.push(fw);
         });
         return merged.sort((a, b) => a.weekId.localeCompare(b.weekId));
       });
     };
 
     const fetchPlan = async () => {
-      // Check cache first
       try {
-        const raw = localStorage.getItem(CACHE_KEY);
-        if (raw) {
-          const { data, ts } = JSON.parse(raw);
-          if (Date.now() - ts < CACHE_TTL && data && Object.keys(data).length > 0) {
-            applyFsMap(data);
-            setIsPlanLoading(false);
-            return;
-          }
-        }
-      } catch { /* cache miss or corrupt — proceed to Firestore */ }
-
-      // Cache miss — fetch from Firestore
-      try {
-        const snap = await getDocs(collection(db, 'bookclubWeeks'));
-        if (!snap.empty) {
-          const fsMap: Record<string, any> = {};
-          snap.docs.forEach(d => { fsMap[d.id] = d.data(); });
+        const fsMap = await fetchStudyPlanOverrides();
+        if (Object.keys(fsMap).length > 0) {
           applyFsMap(fsMap);
-          try {
-            localStorage.setItem(CACHE_KEY, JSON.stringify({ data: fsMap, ts: Date.now() }));
-          } catch { /* storage quota — ignore */ }
         }
       } catch (err) {
         console.warn('BookClubPage: Could not fetch from Firestore, using local baseline.', err);
@@ -496,10 +455,10 @@ const BookClubPage: React.FC = () => {
 
       // Also mark completion if not done yet
       if (!hasMarkedRead) {
-        const newComp = [...new Set([...completions, activeWeek.weekId])];
-        setCompletions(newComp);
-        localStorage.setItem('sms_completions', JSON.stringify(newComp));
-        setHasMarkedRead(true);
+      const newComp = [...new Set([...completions, activeWeek.weekId])];
+      setCompletions(newComp);
+      localStorage.setItem('sms_completions', JSON.stringify(newComp));
+      setHasMarkedRead(true);
       }
 
       // Write excellence badge_event to Firestore
@@ -520,6 +479,22 @@ const BookClubPage: React.FC = () => {
           platform: 'web'
         });
       } catch (e) { console.warn('badge_events write failed', e); }
+    }
+
+    try {
+      await setDoc(doc(db, 'bookClubProgress', `${user.uid}_${activeWeek.weekId}`), {
+        uid: user.uid,
+        weekId: activeWeek.weekId,
+        chapterTitle: activeWeek.chapterTitle,
+        lastQuizCorrect: correct,
+        lastQuizTotal: total,
+        lastQuizPassed: passed,
+        completionMarked: true,
+        excellenceEarned: passed,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+    } catch (error) {
+      console.warn('bookClubProgress write failed', error);
     }
 
     setIsSubmitting(false);
@@ -557,29 +532,27 @@ const BookClubPage: React.FC = () => {
     setBriefcase(newBriefcase);
     localStorage.setItem(`sms_briefcase_${user.uid}`, JSON.stringify(newBriefcase));
 
-    // Cross-sync to Journal Page
-    const journalKey = `sms_journal_${user.uid}`;
-    const journalEntries = JSON.parse(localStorage.getItem(journalKey) || '[]');
-    journalEntries.unshift({
+    await addJournalEntry({
       id: newItem.id,
+      uid: user.uid,
+      userName: user.name,
       title: `${activeWeek.chapterTitle} (Sai Lit Club)`,
       content: sanitizedReflection,
       category: 'Lesson',
       entryDate: new Date().toISOString().split('T')[0],
-      timestamp: newItem.timestamp
+      timestamp: newItem.timestamp,
+      visibility: 'private',
+      isShared: false
     });
-    localStorage.setItem(journalKey, JSON.stringify(journalEntries));
 
     if (isReflectionPublic) {
       try {
-        await addDoc(collection(db, 'reflections'), {
+        await createReflection({
           uid: user.uid,
           userName: user.name,
-          userCentre: (user as any).centre || '',
           weekId: activeWeek.weekId,
           chapterTitle: activeWeek.chapterTitle,
           content: sanitizedReflection,
-          timestamp: serverTimestamp(),
           isPublic: true,
           status: 'pending'
         });
@@ -590,6 +563,20 @@ const BookClubPage: React.FC = () => {
       }
     } else {
       showToast(`${activeWeek.weekId} · ${activeWeek.chapterTitle} saved to your Briefcase!`, "success");
+    }
+
+    try {
+      await setDoc(doc(db, 'bookClubProgress', `${user.uid}_${activeWeek.weekId}`), {
+        uid: user.uid,
+        weekId: activeWeek.weekId,
+        chapterTitle: activeWeek.chapterTitle,
+        latestReflectionAt: serverTimestamp(),
+        latestReflectionPreview: sanitizedReflection.slice(0, 240),
+        isReflectionPublic,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+    } catch (error) {
+      console.warn('bookClubProgress reflection sync failed', error);
     }
 
     setShowSidePanel(false);

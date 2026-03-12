@@ -130,11 +130,34 @@ const DashboardPage: React.FC = () => {
         const mytDate = new Date(new Date().getTime() + 8 * 60 * 60 * 1000);
         const todayStr = mytDate.toISOString().split('T')[0];
         const docRef = doc(db, 'rollups', todayStr);
-        const docSnap = await getDoc(docRef);
+        let members: any[] = [];
 
-        if (docSnap.exists() && user?.uid) {
-          const data = docSnap.data();
-          const members = data.byMember || [];
+        try {
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            members = docSnap.data().byMember || [];
+          }
+        } catch (rollupError) {
+          console.warn('Dashboard rank rollup read failed, falling back to users collection:', rollupError);
+        }
+
+        if (members.length === 0 && user?.uid) {
+          const usersSnap = await getDocs(collection(db, 'users'));
+          members = usersSnap.docs
+            .map((userDoc) => {
+              const data = userDoc.data() as UserProfile;
+              const stats = data.stats || { gayathri: 0, saiGayathri: 0, likitha: 0, mantras: 0 };
+              const count = (stats.gayathri || 0) + (stats.saiGayathri || 0) + (stats.mantras || 0) + ((stats.likitha || 0) * 11);
+              return {
+                uid: userDoc.id,
+                count
+              };
+            })
+            .filter((entry) => entry.count > 0)
+            .sort((a, b) => b.count - a.count);
+        }
+
+        if (user?.uid) {
           const idx = members.findIndex((m: any) => m.uid === user.uid);
           setUserRank({
             rank: idx >= 0 ? idx + 1 : null,
@@ -142,8 +165,6 @@ const DashboardPage: React.FC = () => {
             totalRanked: members.length,
             loaded: true
           });
-        } else {
-          setUserRank(prev => ({ ...prev, loaded: true }));
         }
       } catch (err) {
         console.error("Error fetching rank:", err);

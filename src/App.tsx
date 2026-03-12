@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { onAuthStateChanged, signOut, sendEmailVerification, User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc, updateDoc, onSnapshot, collection, query, where, orderBy, writeBatch } from 'firebase/firestore';
+import { doc, updateDoc, onSnapshot, collection, query, where, orderBy, writeBatch } from 'firebase/firestore';
 import { auth, db } from './lib/firebase';
 import OnboardingTour from './components/OnboardingTour';
 import {
@@ -45,6 +45,9 @@ import Footer from './components/Footer';
 import OfflineBanner from './components/OfflineBanner';
 import MegaMenu from './components/MegaMenu';
 import { usePushNotifications } from './hooks/usePushNotifications';
+import { buildUserProfile, subscribeToMemberProfile } from './services/memberService';
+import { useOnboardingState } from './hooks/useOnboardingState';
+import { DEFAULT_SITE_CONFIG, subscribeToSiteConfig } from './services/siteConfigService';
 
 // Lazy load pages
 const HomePage = lazy(() => import('./pages/HomePage'));
@@ -148,30 +151,21 @@ const Layout: React.FC = () => {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const [showAppTutorial, setShowAppTutorial] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
-  const [tickerMessage, setTickerMessage] = useState(`Welcome to ${APP_CONFIG.NAME} ${APP_CONFIG.TAGLINE} • Supporting Malaysian Sai devotees in their spiritual journey.`);
+  const [tickerMessage, setTickerMessage] = useState(DEFAULT_SITE_CONFIG.tickerMessage);
 
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [branding, setBranding] = useState<BrandingConfig>({
-    logoHeader: APP_CONFIG.LOGO,
-    logoFooter: APP_CONFIG.LOGO_FOOTER || APP_CONFIG.LOGO,
-    logoAuth: APP_CONFIG.LOGO,
-    favicon: APP_CONFIG.LOGO,
-    pwaIcon: APP_CONFIG.LOGO
-  });
+  const [branding, setBranding] = useState<BrandingConfig>(DEFAULT_SITE_CONFIG.branding);
 
-  const [siteContent, setSiteContent] = useState<SiteContent>(DEFAULT_SITE_CONTENT);
-  const [user, setUser] = useState<UserProfile | null>(() => {
-    const saved = localStorage.getItem('sms_user');
-    return saved ? JSON.parse(saved) : null;
-  });
-  const [isAuthChecking, setIsAuthChecking] = useState(() => !localStorage.getItem('sms_user'));
+  const [siteContent, setSiteContent] = useState<SiteContent>(DEFAULT_SITE_CONFIG.siteContent);
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const { permissionStatus, requestPermission } = usePushNotifications(user);
+  const { showAppTutorial, openAppTutorial, closeAppTutorial } = useOnboardingState(user);
 
   useEffect(() => {
     let profileUnsubscribe: (() => void) | null = null;
@@ -183,9 +177,6 @@ const Layout: React.FC = () => {
 
       if (firebaseUser) {
         try {
-          const docRef = doc(db, 'users', firebaseUser.uid);
-
-          // SEC-04: Admin routes protected by Firebase custom claims AND client-side guard
           let claims: any = {};
           try {
             const tokenResult = await firebaseUser.getIdTokenResult();
@@ -194,66 +185,47 @@ const Layout: React.FC = () => {
             console.error("Custom claims fetch error", e);
           }
 
-          // Use onSnapshot for real-time profile updates (streaks, badges, etc.)
-          profileUnsubscribe = onSnapshot(docRef, (docSnap) => {
-            let profileData: Partial<UserProfile> = docSnap.exists() ? docSnap.data() as UserProfile : {};
+          profileUnsubscribe = subscribeToMemberProfile(firebaseUser.uid, (profileData) => {
             const adminEmail = firebaseUser.email?.toLowerCase();
-            const isAdminUser = claims.admin || profileData.isAdmin || (adminEmail && ADMIN_CONFIG.AUTHORIZED_EMAILS.includes(adminEmail));
-            const profile: UserProfile = {
-              uid: firebaseUser.uid,
-              name: profileData.name || firebaseUser.displayName || 'Devotee',
-              email: firebaseUser.email || '',
-              photoURL: profileData.photoURL || firebaseUser.photoURL || APP_CONFIG.AVATAR_MALE,
-              joinedAt: profileData.joinedAt || new Date().toISOString(),
-              isGuest: firebaseUser.isAnonymous,
-              isAdmin: !!isAdminUser,
-              onboardingDone: !!profileData.onboardingDone,
-              onboardedApp: !!profileData.onboardedApp,
-              state: profileData.state || '',
-              centre: profileData.centre || '',
-              ...profileData
-            };
+            const allowedAdminEmails = ADMIN_CONFIG.AUTHORIZED_EMAILS.map((email: string) => email.toLowerCase());
+            const isAdminUser = !!claims.admin || !!profileData?.isAdmin || !!(adminEmail && allowedAdminEmails.includes(adminEmail));
+            const profile = buildUserProfile(firebaseUser, profileData, { isAdmin: isAdminUser });
             setUser(profile);
             localStorage.setItem('sms_user', JSON.stringify(profile));
-
-            // Show tutorial if not done
-            if (!profile.onboardedApp && !profile.isGuest && !showAppTutorial) {
-              setTimeout(() => setShowAppTutorial(true), 1500);
-            }
+            setIsAuthChecking(false);
           }, (error) => {
             console.error("Profile snapshot error:", error);
+            setIsAuthChecking(false);
           });
         } catch (error) {
           console.error("Error setting up profile snapshot:", error);
-          setUser({ uid: firebaseUser.uid, name: firebaseUser.displayName || 'Devotee', email: firebaseUser.email || '', photoURL: firebaseUser.photoURL || APP_CONFIG.AVATAR_MALE, joinedAt: new Date().toISOString(), isGuest: firebaseUser.isAnonymous, isAdmin: false, state: '', onboardingDone: false, centre: '' });
+          setUser(buildUserProfile(firebaseUser, null, { isAdmin: false }));
+          setIsAuthChecking(false);
         }
       } else {
         setUser(null);
         localStorage.removeItem('sms_user');
+        setIsAuthChecking(false);
       }
-      setIsAuthChecking(false);
     });
 
     // CRITICAL: If Firebase onAuthStateChanged never fires (SDK crash / network down),
     // unblock the UI after 3 seconds so users can browse as guest.
     const authTimeout = setTimeout(() => setIsAuthChecking(false), 1200);
 
-    const refreshData = () => {
-      const brand = localStorage.getItem('sms_branding_config');
-      if (brand) setBranding(JSON.parse(brand));
-      const msg = localStorage.getItem('sms_ticker_message');
-      if (msg) setTickerMessage(msg);
-      const content = localStorage.getItem('sms_site_content');
-      if (content) setSiteContent(JSON.parse(content));
-    };
-
-    refreshData();
     const handleScroll = () => setShowScrollTop(window.scrollY > 400);
     // Replay tour when dispatched from the Home page Replay button
-    const handleReplayTour = () => setShowAppTutorial(true);
+    const handleReplayTour = () => openAppTutorial();
     window.addEventListener('scroll', handleScroll);
-    window.addEventListener('storage', refreshData);
     window.addEventListener('sms:replayTour', handleReplayTour);
+
+    const unsubSiteConfig = subscribeToSiteConfig((config) => {
+      setBranding(config.branding);
+      setTickerMessage(config.tickerMessage);
+      setSiteContent(config.siteContent);
+    }, (error) => {
+      console.warn('Site config subscription error:', error);
+    });
 
     const unsubAnnouncements = onSnapshot(
       query(collection(db, 'announcements'), orderBy('timestamp', 'desc')),
@@ -291,12 +263,12 @@ const Layout: React.FC = () => {
       unsubscribe();
       unsubNotifications();
       unsubAnnouncements();
+      unsubSiteConfig();
       clearTimeout(authTimeout);
       window.removeEventListener('scroll', handleScroll);
-      window.removeEventListener('storage', refreshData);
       window.removeEventListener('sms:replayTour', handleReplayTour);
     };
-  }, [user?.uid, user?.isGuest]);
+  }, [user?.uid, user?.isGuest, openAppTutorial]);
 
   const handleLogout = async () => {
     try {
@@ -504,8 +476,8 @@ const Layout: React.FC = () => {
       {showAppTutorial && (
         <OnboardingTour
           userName={user?.name}
-          onComplete={() => { setShowAppTutorial(false); markAppTutorialDone(); }}
-          onSkip={() => { setShowAppTutorial(false); markAppTutorialDone(); }}
+          onComplete={() => { closeAppTutorial(); markAppTutorialDone(); }}
+          onSkip={() => { closeAppTutorial(); markAppTutorialDone(); }}
         />
       )}
       <BottomNav user={user} />
