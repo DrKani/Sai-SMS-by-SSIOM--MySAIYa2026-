@@ -5,6 +5,7 @@ import { getFirestore, initializeFirestore, persistentLocalCache, persistentMult
 import { getStorage } from "firebase/storage";
 import { getAnalytics, isSupported } from "firebase/analytics";
 import { getMessaging, isSupported as isMessagingSupported } from "firebase/messaging";
+import { getFunctions } from "firebase/functions";
 
 // Config will be populated after app creation or from environment variables
 // For now, we set up the structure to be ready for the config values
@@ -37,6 +38,7 @@ export const db = initializeFirestore(app, {
 });
 
 export const storage = getStorage(app);
+export const functions = getFunctions(app);
 
 // Analytics defaults to null if not supported (e.g. in some SSR contexts or restricted environments)
 export let analytics = null;

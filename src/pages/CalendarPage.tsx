@@ -3,22 +3,19 @@ import React, { useState, useEffect } from 'react';
 import InteractiveCalendar from '../components/InteractiveCalendar';
 import { MOCK_EVENTS } from '../constants';
 import { Calendar as CalendarIcon, Info, Bell, MapPin, Loader2 } from 'lucide-react';
-import { db } from '../lib/firebase';
-import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { SmsEvent } from '../types';
+import { subscribeToEvents } from '../services/eventService';
 
 const CalendarPage: React.FC = () => {
    const [events, setEvents] = useState<SmsEvent[]>([]);
    const [isLoading, setIsLoading] = useState(true);
 
    useEffect(() => {
-      const q = query(collection(db, 'calendar'), orderBy('eventDate', 'asc'));
-      const unsub = onSnapshot(q, (snap) => {
-         const evts = snap.docs.map(doc => ({
-            ...doc.data(),
-            eventId: doc.id
-         })) as SmsEvent[];
+      const unsub = subscribeToEvents((evts) => {
          setEvents(evts);
+         setIsLoading(false);
+      }, (error) => {
+         console.error("Error fetching calendar events:", error);
          setIsLoading(false);
       });
       return () => unsub();

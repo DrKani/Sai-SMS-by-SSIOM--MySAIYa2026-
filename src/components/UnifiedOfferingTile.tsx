@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Users, Mic, Target, Trophy, ChevronDown, User, ArrowRight, Medal, Crown } from 'lucide-react';
+import { Users, Mic, Target, Trophy, ArrowRight, Medal, Crown } from 'lucide-react';
 import { NationalStats, MantraBreakdown } from '../lib/nationalStats';
 import { UserProfile } from '../types';
 import { doc, getDoc, collection, getDocs, getCountFromServer } from 'firebase/firestore';
@@ -83,7 +83,7 @@ const UnifiedOfferingTile: React.FC<UnifiedOfferingTileProps> = ({ globalStats, 
     const [centres, setCentres] = useState<LeaderboardEntry[]>([]);
     const [states, setStates] = useState<LeaderboardEntry[]>([]);
     const [devotees, setDevotees] = useState<LeaderboardEntry[]>([]);
-    const [isLoadingLb, setIsLoadingLb] = useState(true);
+    const [isLoading, setIsLoading] = useState(true);
     // Registered user count — separate from chanting participants
     const [registeredCount, setRegisteredCount] = useState<number | null>(null);
 
@@ -96,34 +96,40 @@ const UnifiedOfferingTile: React.FC<UnifiedOfferingTileProps> = ({ globalStats, 
 
     // Fetch Leaderboard Logic (adapted from HomeLeaderboard.tsx)
     const fetchLeaderboardData = useCallback(async () => {
-        setIsLoadingLb(true);
+        setIsLoading(true);
         try {
             const today = new Date().toISOString().split('T')[0];
             const rollupRef = doc(db, 'rollups', today);
-            const rollupSnap = await getDoc(rollupRef);
+            let shouldFallback = true;
 
-            if (rollupSnap.exists()) {
-                const data = rollupSnap.data() as any;
-                if (data.byCentre) {
-                    setCentres(Object.entries(data.byCentre)
-                        .map(([name, val]: [string, any]) => ({
-                            id: name, name, sub: val.state || '', count: typeof val === 'number' ? val : val.count || 0, rank: 0
-                        }))
-                        .sort((a, b) => b.count - a.count).slice(0, 5).map((e, i) => ({ ...e, rank: i + 1 })));
+            try {
+                const rollupSnap = await getDoc(rollupRef);
+                if (rollupSnap.exists()) {
+                    const data = rollupSnap.data() as any;
+                    if (data.byCentre) {
+                        setCentres(Object.entries(data.byCentre)
+                            .map(([name, val]: [string, any]) => ({
+                                id: name, name, sub: val.state || '', count: typeof val === 'number' ? val : val.count || 0, rank: 0
+                            }))
+                            .sort((a, b) => b.count - a.count).slice(0, 5).map((e, i) => ({ ...e, rank: i + 1 })));
+                    }
+                    if (data.byState) {
+                        setStates(Object.entries(data.byState)
+                            .map(([name, count]) => ({ id: name, name, sub: 'Malaysian State', count: count as number, rank: 0 }))
+                            .sort((a, b) => b.count - a.count).slice(0, 5).map((e, i) => ({ ...e, rank: i + 1 })));
+                    }
+                    if (data.byMember) {
+                        setDevotees(data.byMember.slice(0, 5).map((m: any, i: number) => ({
+                            id: m.uid, name: m.name, sub: `${m.centre || ''}${m.state ? ` · ${m.state}` : ''}`, count: m.count, rank: i + 1
+                        })));
+                    }
+                    shouldFallback = false;
                 }
-                if (data.byState) {
-                    setStates(Object.entries(data.byState)
-                        .map(([name, count]) => ({ id: name, name, sub: 'Malaysian State', count: count as number, rank: 0 }))
-                        .sort((a, b) => b.count - a.count).slice(0, 5).map((e, i) => ({ ...e, rank: i + 1 })));
-                }
-                if (data.byMember) {
-                    setDevotees(data.byMember.slice(0, 5).map((m: any, i: number) => ({
-                        id: m.uid, name: m.name, sub: `${m.centre || ''}${m.state ? ` · ${m.state}` : ''}`, count: m.count, rank: i + 1
-                    })));
-                }
-            } else {
-                // Fallback: live aggregation from ALL users — no publicLeaderboard filter
-                // so every devotee who submits chants appears immediately
+            } catch (rollupError) {
+                console.warn('Rollup read failed, falling back to users collection:', rollupError);
+            }
+
+            if (shouldFallback) {
                 const snap = await getDocs(collection(db, 'users'));
                 const cTotals: Record<string, { count: number; state: string }> = {};
                 const sTotals: Record<string, number> = {};
@@ -157,7 +163,7 @@ const UnifiedOfferingTile: React.FC<UnifiedOfferingTileProps> = ({ globalStats, 
         } catch (err) {
             console.error('Failed to fetch leaderboard:', err);
         } finally {
-            setIsLoadingLb(false);
+            setIsLoading(false);
         }
     }, []);
 
@@ -275,7 +281,7 @@ const UnifiedOfferingTile: React.FC<UnifiedOfferingTileProps> = ({ globalStats, 
 
                     {/* List */}
                     <div className="flex-grow space-y-2 relative min-h-[200px]">
-                        {isLoadingLb ? (
+                                    {isLoading ? (
                             <div className="absolute inset-0 flex items-center justify-center">
                                 <div className="w-8 h-8 border-2 border-navy-200 border-t-gold-500 rounded-full animate-spin"></div>
                             </div>

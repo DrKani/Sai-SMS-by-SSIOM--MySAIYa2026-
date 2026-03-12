@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { db } from '../lib/firebase';
-import { doc, getDoc, updateDoc, arrayUnion, Timestamp } from 'firebase/firestore';
+import { Timestamp } from 'firebase/firestore';
 import { SmsEvent, UserProfile } from '../types';
 import {
     Calendar, MapPin, Users, Clock, ArrowLeft,
@@ -10,6 +9,7 @@ import {
 } from 'lucide-react';
 import { ToastContainer, useToast } from '../components/Toast';
 import { MOCK_EVENTS } from '../constants';
+import { fetchEventById, registerForEvent } from '../services/eventService';
 
 const EventDetailPage: React.FC = () => {
     const { eventId } = useParams();
@@ -37,10 +37,9 @@ const EventDetailPage: React.FC = () => {
             }
 
             try {
-                const docRef = doc(db, 'calendar', eventId);
-                const docSnap = await getDoc(docRef);
-                if (docSnap.exists()) {
-                    setEvent({ ...docSnap.data(), eventId: docSnap.id } as SmsEvent);
+                const liveEvent = await fetchEventById(eventId);
+                if (liveEvent) {
+                    setEvent(liveEvent);
                 } else {
                     showToast("Event not found.", "error");
                     navigate('/events');
@@ -73,11 +72,7 @@ const EventDetailPage: React.FC = () => {
 
         setIsRegistering(true);
         try {
-            const eventRef = doc(db, 'calendar', event.eventId);
-            await updateDoc(eventRef, {
-                registeredUsers: arrayUnion(user.uid),
-                registeredCount: (event.registeredCount || 0) + 1
-            });
+            await registerForEvent(event, user.uid);
             showToast("Successfully registered for event!", "success");
             setEvent({
                 ...event,

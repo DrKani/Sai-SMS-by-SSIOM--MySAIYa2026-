@@ -7,8 +7,8 @@ import {
 import { SmsEvent, UserProfile } from '../types';
 import { ANNUAL_STUDY_PLAN } from '../constants';
 import { ToastContainer, useToast } from '../components/Toast';
-import { db } from '../lib/firebase';
-import { doc, updateDoc, arrayUnion, Timestamp } from 'firebase/firestore';
+import { Timestamp } from 'firebase/firestore';
+import { registerForEvent } from '../services/eventService';
 
 interface Props {
   events: SmsEvent[];
@@ -137,11 +137,7 @@ const InteractiveCalendar: React.FC<Props> = ({ events }) => {
 
     setIsRegistering(true);
     try {
-      const eventRef = doc(db, 'calendar', selectedEvent.eventId);
-      await updateDoc(eventRef, {
-        registeredUsers: arrayUnion(user.uid),
-        registeredCount: (selectedEvent.registeredCount || 0) + 1
-      });
+      await registerForEvent(selectedEvent, user.uid);
       showToast("Successfully registered for event!", "success");
       // Update local state if needed or wait for Firestore push
       setSelectedEvent({

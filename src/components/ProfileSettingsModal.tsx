@@ -98,7 +98,7 @@ const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({ isOpen, onC
 
     setUploading(true);
     try {
-      const storageRef = ref(storage, `profiles/${auth.currentUser.uid}_${Date.now()}`);
+      const storageRef = ref(storage, `users/${auth.currentUser.uid}/profiles/${Date.now()}_${file.name}`);
       const snapshot = await uploadBytes(storageRef, file);
       const url = await getDownloadURL(snapshot.ref);
       setFormData(prev => ({ ...prev, photoURL: url }));

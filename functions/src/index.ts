@@ -142,6 +142,43 @@ async function logDailyHealth(
     });
 }
 
+function buildJournalEncouragement(content: string): string {
+    const normalized = content.toLowerCase();
+
+    if (normalized.includes("grateful") || normalized.includes("gratitude") || normalized.includes("thank")) {
+        return "Gratitude softens the heart and makes it ready for grace. Hold on to that thankfulness and let it become loving action in your day.";
+    }
+
+    if (normalized.includes("fear") || normalized.includes("anxious") || normalized.includes("worry")) {
+        return "Offer your worry at Swami's feet and take the next step calmly. Courage grows when remembrance is steady and the heart returns to love.";
+    }
+
+    if (normalized.includes("serve") || normalized.includes("seva") || normalized.includes("help")) {
+        return "Every act of sincere service purifies the mind and widens the heart. Continue gently, and let humility protect the goodness of what you do.";
+    }
+
+    if (normalized.includes("anger") || normalized.includes("hurt") || normalized.includes("sad")) {
+        return "Pain can become prayer when it is offered with honesty. Stay gentle with yourself, and let love guide your next word, not the weight of the moment.";
+    }
+
+    return "Your reflection shows sincerity, and sincerity itself is sacred progress. Continue with patience, love, and self-observation, and Swami's guidance will become clearer in daily life.";
+}
+
+export const getJournalEncouragement = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError("unauthenticated", "Sign in is required.");
+    }
+
+    const content = typeof data?.content === "string" ? data.content.trim() : "";
+    if (content.length < 10) {
+        throw new functions.https.HttpsError("invalid-argument", "Journal content is too short.");
+    }
+
+    return {
+        text: buildJournalEncouragement(content.slice(0, 2000)),
+    };
+});
+
 // ─── Exported Cloud Function ──────────────────────────────────────────────────
 
 /**
@@ -509,4 +546,3 @@ export const onAnnouncementCreated = functions.firestore
             await batch.commit();
         }
     });
-

@@ -43,6 +43,9 @@ import {
 import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc, addDoc, serverTimestamp, query, orderBy, onSnapshot, Timestamp, where, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import Papa from 'papaparse';
+import { deleteEvent as deleteCalendarEvent, saveEvent as saveCalendarEvent, subscribeToEvents } from '../services/eventService';
+import { fetchAllReflections, updateReflection } from '../services/reflectionService';
+import { DEFAULT_SITE_CONFIG, saveBrandingConfig, saveSiteContent, saveTickerMessage, subscribeToSiteConfig } from '../services/siteConfigService';
 
 // --- UTILITIES ---
 const logAdminAction = (adminEmail: string, action: string, resource: string, outcome: 'success' | 'failure' = 'success') => {
@@ -435,39 +438,21 @@ const ReflectionQueue = ({ adminEmail }: { adminEmail: string }) => {
    const [adminComment, setAdminComment] = useState<Record<string, string>>({});
    const [expandedId, setExpandedId] = useState<string | null>(null);
 
-   const loadQueue = () => {
-      const queue: Reflection[] = JSON.parse(localStorage.getItem('sms_reflections_queue') || '[]');
-      // Sort pending first, then by timestamp desc
-      queue.sort((a, b) => {
-         if (a.status === 'pending' && b.status !== 'pending') return -1;
-         if (b.status === 'pending' && a.status !== 'pending') return 1;
-         return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
-      });
-      setReflections(queue);
+   const loadQueue = async () => {
+      try {
+         setReflections(await fetchAllReflections());
+      } catch (e) {
+         console.error("Failed to load reflections", e);
+      }
    };
 
    useEffect(() => {
-      const loadReflections = async () => {
-         try {
-            const snap = await getDocs(collection(db, 'reflections'));
-            const refs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Reflection));
-            // Show pending first
-            refs.sort((a, b) => {
-               if (a.status === 'pending' && b.status !== 'pending') return -1;
-               if (a.status !== 'pending' && b.status === 'pending') return 1;
-               return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
-            });
-            setReflections(refs);
-         } catch (e) {
-            console.error("Failed to load reflections", e);
-         }
-      };
-      loadReflections();
+      loadQueue();
    }, []);
 
    const updateStatus = async (id: string, status: 'approved' | 'rejected') => {
       try {
-         await updateDoc(doc(db, 'reflections', id), { status });
+         await updateReflection(id, { status });
          const updated = reflections.map(r => r.id === id ? { ...r, status } : r);
          setReflections(updated);
          logAdminAction(adminEmail, `Reflection ${status}`, id);
@@ -480,13 +465,19 @@ const ReflectionQueue = ({ adminEmail }: { adminEmail: string }) => {
 
    const saveAdminComment = (id: string) => {
       const comment = adminComment[id] || '';
-      const updated = reflections.map(r =>
-         r.id === id ? { ...r, adminComments: comment } : r
-      );
-      setReflections(updated);
-      localStorage.setItem('sms_reflections_queue', JSON.stringify(updated));
-      logAdminAction(adminEmail, 'Added Admin Comment', id);
-      setExpandedId(null);
+      updateReflection(id, { adminComments: comment })
+         .then(() => {
+            const updated = reflections.map(r =>
+               r.id === id ? { ...r, adminComments: comment } : r
+            );
+            setReflections(updated);
+            logAdminAction(adminEmail, 'Added Admin Comment', id);
+            setExpandedId(null);
+         })
+         .catch((error) => {
+            console.error("Failed to save admin comment", error);
+            alert("Failed to save admin comment.");
+         });
    };
 
    const counts = {
@@ -755,17 +746,18 @@ const SadhanaAnalytics = () => {
 
 // 6. PAGE CONTENT MANAGER (STATIC TEXT)
 const PageContentManager = ({ adminEmail }: { adminEmail: string }) => {
-   const [content, setContent] = useState<SiteContent>(DEFAULT_SITE_CONTENT);
+   const [content, setContent] = useState<SiteContent>(DEFAULT_SITE_CONFIG.siteContent);
 
    useEffect(() => {
-      const saved = localStorage.getItem('sms_site_content');
-      if (saved) setContent(JSON.parse(saved));
+      const unsubscribe = subscribeToSiteConfig((config) => {
+         setContent(config.siteContent);
+      });
+      return () => unsubscribe();
    }, []);
 
-   const saveContent = () => {
-      localStorage.setItem('sms_site_content', JSON.stringify(content));
+   const saveContent = async () => {
+      await saveSiteContent(content);
       logAdminAction(adminEmail, 'Updated Site Text', 'Global Content');
-      window.dispatchEvent(new Event('storage'));
       alert("Page Content Updated Successfully! Changes are now live.");
    };
 
@@ -849,10 +841,9 @@ const CommunicationsManager = ({ adminEmail }: { adminEmail: string }) => {
    });
 
    useEffect(() => {
-      // Load Ticker
-      const storedTicker = localStorage.getItem('sms_ticker_message');
-      if (storedTicker) setTickerMsg(storedTicker);
-      else setTickerMsg(`Welcome to ${APP_CONFIG.NAME} ${APP_CONFIG.TAGLINE} • Supporting Malaysian Sai devotees in their spiritual journey.`);
+      const unsubscribe = subscribeToSiteConfig((config) => {
+         setTickerMsg(config.tickerMessage);
+      });
 
       // Load Announcements
       const fetchAnns = async () => {
@@ -865,13 +856,12 @@ const CommunicationsManager = ({ adminEmail }: { adminEmail: string }) => {
          }
       };
       fetchAnns();
+      return () => unsubscribe();
    }, []);
 
-   const saveTicker = () => {
-      localStorage.setItem('sms_ticker_message', tickerMsg);
+   const saveTicker = async () => {
+      await saveTickerMessage(tickerMsg);
       logAdminAction(adminEmail, 'Updated Ticker', 'Global Marquee');
-      // Dispatch event to update App.tsx immediately
-      window.dispatchEvent(new Event('storage'));
       alert("Live Ticker Updated Successfully!");
    };
 
@@ -1409,12 +1399,7 @@ const EventManager = ({ adminEmail }: { adminEmail: string }) => {
    });
 
    useEffect(() => {
-      const q = query(collection(db, 'calendar'), orderBy('eventDate', 'desc'));
-      const unsub = onSnapshot(q, (snap) => {
-         const evts = snap.docs.map(doc => ({
-            ...doc.data(),
-            eventId: doc.id
-         })) as SmsEvent[];
+      const unsub = subscribeToEvents((evts) => {
          setEvents(evts);
          setIsLoading(false);
       }, (err) => {
@@ -1433,28 +1418,11 @@ const EventManager = ({ adminEmail }: { adminEmail: string }) => {
       setIsSaving(true);
       try {
          const currentUser = JSON.parse(localStorage.getItem('sms_user') || '{}');
-         const eventData: any = {
-            title: newEvent.title,
-            description: newEvent.description || '',
-            eventDate: Timestamp.fromDate(new Date(newEvent.eventDate!)),
-            endDate: newEvent.endDate ? Timestamp.fromDate(new Date(newEvent.endDate)) : null,
-            location: newEvent.location,
-            type: newEvent.type || 'spiritual',
-            maxAttendees: Number(newEvent.maxAttendees) || 0,
-            imageUrl: newEvent.imageUrl || '',
-            status: newEvent.status || 'published'
-         };
-
+         await saveCalendarEvent(newEvent as any, currentUser.uid || 'admin', editingId);
          if (editingId) {
-            await updateDoc(doc(db, 'calendar', editingId), eventData);
             logAdminAction(adminEmail, 'Edited Event', newEvent.title || 'Unknown');
             alert("Event updated successfully!");
          } else {
-            eventData.registeredCount = 0;
-            eventData.registeredUsers = [];
-            eventData.createdBy = currentUser.uid || 'admin';
-            eventData.createdAt = serverTimestamp();
-            await addDoc(collection(db, 'calendar'), eventData);
             logAdminAction(adminEmail, 'Created Event', newEvent.title || 'Unknown');
             alert("Event published successfully!");
          }
@@ -1500,7 +1468,7 @@ const EventManager = ({ adminEmail }: { adminEmail: string }) => {
    const handleDelete = async (id: string) => {
       if (!window.confirm("Are you sure you want to delete this event?")) return;
       try {
-         await deleteDoc(doc(db, 'calendar', id));
+         await deleteCalendarEvent(id);
          logAdminAction(adminEmail, 'Deleted Event', id);
       } catch (error) {
          console.error("Error deleting event:", error);
@@ -1657,19 +1625,17 @@ const EventManager = ({ adminEmail }: { adminEmail: string }) => {
 
 // 2. BRANDING MANAGER (UNCHANGED)
 const BrandingManager = ({ adminEmail }: { adminEmail: string }) => {
-   const [config, setConfig] = useState<BrandingConfig>(() => {
-      const saved = localStorage.getItem('sms_branding_config');
-      return saved ? JSON.parse(saved) : {
-         logoHeader: APP_CONFIG.LOGO,
-         logoFooter: APP_CONFIG.LOGO,
-         logoAuth: APP_CONFIG.LOGO,
-         favicon: APP_CONFIG.LOGO,
-         pwaIcon: APP_CONFIG.LOGO
-      };
-   });
+   const [config, setConfig] = useState<BrandingConfig>(DEFAULT_SITE_CONFIG.branding);
 
-   const saveConfig = () => {
-      localStorage.setItem('sms_branding_config', JSON.stringify(config));
+   useEffect(() => {
+      const unsubscribe = subscribeToSiteConfig((siteConfig) => {
+         setConfig(siteConfig.branding);
+      });
+      return () => unsubscribe();
+   }, []);
+
+   const saveConfig = async () => {
+      await saveBrandingConfig(config);
       logAdminAction(adminEmail, 'Updated Branding', 'Global Config');
       window.location.reload();
    };
@@ -2876,7 +2842,7 @@ const JournalManager = ({ adminEmail }: { adminEmail: string }) => {
    const load = async () => {
       setIsLoading(true);
       try {
-         const snap = await getDocs(query(collection(db, 'journal'), orderBy('createdAt', 'desc')));
+         const snap = await getDocs(query(collection(db, 'journals'), orderBy('createdAt', 'desc')));
          setEntries(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       } catch (e) {
          console.error('Journal load error:', e);
@@ -2890,7 +2856,7 @@ const JournalManager = ({ adminEmail }: { adminEmail: string }) => {
    const deleteEntry = async (id: string) => {
       if (!window.confirm('Permanently delete this journal entry?')) return;
       try {
-         await deleteDoc(doc(db, 'journal', id));
+         await deleteDoc(doc(db, 'journals', id));
          setEntries(prev => prev.filter(e => e.id !== id));
          logAdminAction(adminEmail, 'Deleted Journal Entry', id);
       } catch (e) { console.error(e); }

@@ -82,7 +82,7 @@ const CreateAnnouncementPage = () => {
                 type,
                 category,
                 status: status,
-                timestamp: serverTimestamp(), // legacy compatibility
+                timestamp: new Date().toISOString(), // legacy compatibility
                 createdAt: serverTimestamp(),
                 createdBy: {
                     uid: adminUid,

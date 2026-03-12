@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../lib/firebase';
-import { collection, query, orderBy, onSnapshot, where } from 'firebase/firestore';
 import { SmsEvent } from '../types';
 import { Calendar, MapPin, Users, ChevronRight, Filter, Search, Loader2, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { MOCK_EVENTS } from '../constants';
+import { subscribeToEvents } from '../services/eventService';
 
 const EventsPage: React.FC = () => {
     const [events, setEvents] = useState<SmsEvent[]>([]);
@@ -13,13 +12,11 @@ const EventsPage: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState('');
 
     useEffect(() => {
-        const q = query(collection(db, 'calendar'), orderBy('eventDate', 'asc'));
-        const unsub = onSnapshot(q, (snap) => {
-            const evts = snap.docs.map(doc => ({
-                ...doc.data(),
-                eventId: doc.id
-            })) as SmsEvent[];
+        const unsub = subscribeToEvents((evts) => {
             setEvents(evts);
+            setIsLoading(false);
+        }, (error) => {
+            console.error("Error fetching events:", error);
             setIsLoading(false);
         });
         return () => unsub();
