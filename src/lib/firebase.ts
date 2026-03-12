@@ -7,16 +7,24 @@ import { getAnalytics, isSupported } from "firebase/analytics";
 import { getMessaging, isSupported as isMessagingSupported } from "firebase/messaging";
 import { getFunctions } from "firebase/functions";
 
-// Config will be populated after app creation or from environment variables
-// For now, we set up the structure to be ready for the config values
+const FALLBACK_FIREBASE_CONFIG = {
+    apiKey: "AIzaSyB55m8MjdqJHgkZK4_XOA964It1jqXO7p4",
+    authDomain: "sai-sms-by-ssiom-mysaiya-2026.firebaseapp.com",
+    projectId: "sai-sms-by-ssiom-mysaiya-2026",
+    storageBucket: "sai-sms-by-ssiom-mysaiya-2026.firebasestorage.app",
+    messagingSenderId: "136292931128",
+    appId: "1:136292931128:web:4946db8389f5e5386f38cd",
+    measurementId: "G-TL5P16CYW9"
+};
+
 const firebaseConfig = {
-    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-    appId: import.meta.env.VITE_FIREBASE_APP_ID,
-    measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY || FALLBACK_FIREBASE_CONFIG.apiKey,
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || FALLBACK_FIREBASE_CONFIG.authDomain,
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || FALLBACK_FIREBASE_CONFIG.projectId,
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || FALLBACK_FIREBASE_CONFIG.storageBucket,
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || FALLBACK_FIREBASE_CONFIG.messagingSenderId,
+    appId: import.meta.env.VITE_FIREBASE_APP_ID || FALLBACK_FIREBASE_CONFIG.appId,
+    measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || FALLBACK_FIREBASE_CONFIG.measurementId
 };
 
 // Initialize Firebase
