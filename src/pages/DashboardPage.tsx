@@ -291,7 +291,7 @@ const DashboardPage: React.FC = () => {
           <div className="bg-white/50 backdrop-blur border border-navy-50 p-4 rounded-3xl flex items-center gap-3">
             <Award size={20} className="text-gold-500" />
             <div className="text-left">
-              <span className="block text-[8px] font-black uppercase tracking-widest text-navy-300">Spiritual Rank</span>
+              <span className="block text-[8px] font-black uppercase tracking-widest text-navy-600">Spiritual Rank</span>
               <span className="text-xs font-bold text-navy-900">{stats.booksRead >= 4 ? 'Devoted Student' : 'New Sadhaka'}</span>
             </div>
           </div>
@@ -336,7 +336,7 @@ const DashboardPage: React.FC = () => {
                   <button
                     key={t}
                     onClick={() => setTimeframe(t)}
-                    className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${timeframe === t ? 'bg-white text-navy-900 shadow border border-navy-50' : 'text-navy-400 hover:text-navy-900'}`}
+                    className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${timeframe === t ? 'bg-white text-navy-900 shadow border border-navy-50' : 'text-navy-600 hover:text-navy-900'}`}
                   >
                     {t.replace('-', ' ')}
                   </button>

@@ -34,6 +34,7 @@ interface MegaMenuProps {
   bookClubProgress?: string;
   lastActiveModule?: string;
   announcements?: Announcement[];
+  newArticlesCount?: number;
 }
 
 // ── Navigation Data ───────────────────────────────────────────────────────────
@@ -161,6 +162,7 @@ const MegaMenu: React.FC<MegaMenuProps> = ({
   bookClubProgress = '',
   lastActiveModule = '/dashboard',
   announcements = [],
+  newArticlesCount = 0,
 }) => {
   const location = useLocation();
   const [activeSection, setActiveSection] = useState<string>('home');
@@ -169,7 +171,19 @@ const MegaMenu: React.FC<MegaMenuProps> = ({
   const [isMobile, setIsMobile] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const firstInteractiveRef = useRef<HTMLButtonElement>(null);
-  const today = new Date('2026-03-12T02:46:26+08:00');
+  const today = new Date();
+
+  // Notification badges computation
+  const profileIncomplete = !!(user && !user.isGuest && (!user.centre || !user.state));
+  const adminHasPending = !!isAdmin; // show badge for admins as reminder
+  const hasBlogBadge = newArticlesCount > 0 || announcements.length > 0;
+
+  // Which section IDs have a badge
+  const sectionBadges: Record<string, { label: string; color: string }> = {
+    my: profileIncomplete ? { label: '!', color: '#EF4444' } : {} as any,
+    admin: adminHasPending ? { label: '!', color: '#F59E0B' } : {} as any,
+    learn: hasBlogBadge ? { label: 'NEW', color: '#8B5CF6' } : {} as any,
+  };
 
   // Detect viewport
   useEffect(() => {
@@ -356,6 +370,14 @@ const MegaMenu: React.FC<MegaMenuProps> = ({
                 >
                   <span className="mega-section-icon" aria-hidden>{section.icon}</span>
                   <span className="mega-section-label">{section.label}</span>
+                  {sectionBadges[section.id]?.label && (
+                    <span
+                      className="ml-auto shrink-0 text-[9px] font-black text-white rounded-full px-1.5 py-0.5 leading-none"
+                      style={{ background: sectionBadges[section.id].color }}
+                    >
+                      {sectionBadges[section.id].label}
+                    </span>
+                  )}
                   <ChevronRight size={14} className="mega-section-chevron" aria-hidden />
                 </button>
               </li>
@@ -467,6 +489,14 @@ const MegaMenu: React.FC<MegaMenuProps> = ({
                 <span className="flex items-center gap-3">
                   <span className="mega-section-icon" aria-hidden>{section.icon}</span>
                   <span className="mega-accordion-label">{section.label}</span>
+                  {sectionBadges[section.id]?.label && (
+                    <span
+                      className="text-[9px] font-black text-white rounded-full px-1.5 py-0.5 leading-none"
+                      style={{ background: sectionBadges[section.id].color }}
+                    >
+                      {sectionBadges[section.id].label}
+                    </span>
+                  )}
                 </span>
                 <ChevronDown
                   size={16}

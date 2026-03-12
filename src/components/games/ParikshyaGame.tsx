@@ -227,12 +227,12 @@ export default function ParikshyaGame() {
                                     <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${colors.badge} text-white`}>Level {lev.levelNum}</span>
                                     <div className="flex items-center gap-1">
                                         {prog ? getBadgeIcon(prog.bestScore) : unlocked ? null : <Lock size={14} className="text-white/30" />}
-                                        {prog && <span className="text-[10px] text-white/50 font-bold">{prog.bestScore}%</span>}
+                                        {prog && <span className="text-[10px] text-white/75 font-bold">{prog.bestScore}%</span>}
                                     </div>
                                 </div>
                                 <h3 className={`font-bold text-sm mb-1 ${colors.text}`}>{lev.title}</h3>
-                                <p className="text-white/50 text-[11px] mb-3 flex-grow">{lev.subtitle}</p>
-                                <div className="flex justify-between text-[10px] text-white/40 font-black uppercase mb-4">
+                                <p className="text-white/80 text-[11px] mb-3 flex-grow">{lev.subtitle}</p>
+                                <div className="flex justify-between text-[10px] text-white/70 font-black uppercase mb-4">
                                     <span><Clock size={10} className="inline mr-1" />{lev.timerSeconds}s/Q</span>
                                     <span>{lev.questions.length} Questions</span>
                                     <span>{lev.badge}</span>
@@ -242,7 +242,7 @@ export default function ParikshyaGame() {
                                         <PlayCircle size={14} /> {prog ? 'Replay' : 'Begin Parikshya'}
                                     </button>
                                 ) : (
-                                    <div className="w-full py-3 bg-white/5 text-white/30 font-black uppercase tracking-widest text-[10px] rounded-xl text-center flex justify-center items-center gap-2">
+                                    <div className="w-full py-3 bg-white/5 text-white/60 font-black uppercase tracking-widest text-[10px] rounded-xl text-center flex justify-center items-center gap-2">
                                         <Lock size={12} /> Score 60%+ on Level {idx} to unlock
                                     </div>
                                 )}

@@ -383,12 +383,12 @@ const ChantingPage: React.FC = () => {
 
           <div>
             <div className="flex gap-4 mb-10 bg-neutral-100 p-2 rounded-2xl border border-neutral-200 shadow-inner">
-              <button onClick={() => setChantingType('Gayathri')} className={`flex-1 py-4 px-4 rounded-xl font-black uppercase tracking-widest text-[10px] transition-all border-2 ${chantingType === 'Gayathri' ? 'bg-navy-900 text-gold-500 border-gold-500 shadow-lg' : 'text-navy-300 border-transparent'}`}>Gayathri Mantra</button>
-              <button onClick={() => setChantingType('SaiGayathri')} className={`flex-1 py-4 px-4 rounded-xl font-black uppercase tracking-widest text-[10px] transition-all border-2 ${chantingType === 'SaiGayathri' ? 'bg-navy-900 text-gold-500 border-gold-500 shadow-lg' : 'text-navy-300 border-transparent'}`}>Sai Gayathri</button>
+              <button onClick={() => setChantingType('Gayathri')} className={`flex-1 py-4 px-4 rounded-xl font-black uppercase tracking-widest text-[10px] transition-all border-2 ${chantingType === 'Gayathri' ? 'bg-navy-900 text-gold-500 border-gold-500 shadow-lg' : 'text-navy-700 border-transparent'}`}>Gayathri Mantra</button>
+              <button onClick={() => setChantingType('SaiGayathri')} className={`flex-1 py-4 px-4 rounded-xl font-black uppercase tracking-widest text-[10px] transition-all border-2 ${chantingType === 'SaiGayathri' ? 'bg-navy-900 text-gold-500 border-gold-500 shadow-lg' : 'text-navy-700 border-transparent'}`}>Sai Gayathri</button>
             </div>
 
             <div className="text-center space-y-8 py-10">
-              <span className="text-[10px] font-black text-navy-200 uppercase tracking-[0.4em]">Sacred Repetitions</span>
+              <span className="text-[10px] font-black text-navy-600 uppercase tracking-[0.4em]">Sacred Repetitions</span>
               <div className="flex items-center justify-center gap-10">
                 <button onClick={decrement} className="w-16 h-16 bg-neutral-50 rounded-full flex items-center justify-center hover:bg-navy-900 hover:text-white transition-all text-navy-300 border border-neutral-200">
                   <Minus size={32} />
@@ -456,7 +456,7 @@ const ChantingPage: React.FC = () => {
                 <span className="block text-[10px] uppercase tracking-widest text-navy-200 mb-1 font-black">Valid Mantras Detected</span>
                 <div className="flex items-baseline gap-1">
                   <span className={`text-4xl font-black ${isJapamComplete ? 'text-teal-500' : 'text-gold-500'}`}>{completedLinesCount}</span>
-                  <span className="text-xl text-navy-100">/ {Math.max(11, Math.ceil((completedLinesCount + 1) / 11) * 11)}</span>
+                  <span className="text-xl text-navy-500">/ {Math.max(11, Math.ceil((completedLinesCount + 1) / 11) * 11)}</span>
                 </div>
               </div>
               <button onClick={() => setShowClearConfirm(true)} className="text-[9px] font-black uppercase tracking-widest text-navy-200 hover:text-navy-900 underline">Clear Form</button>

@@ -72,7 +72,7 @@ const Tooltip: React.FC<TooltipProps> = ({ content, children, className = '' }) 
             {isVisible && content && createPortal(
                 <div
                     ref={tooltipRef}
-                    className="fixed z-[9999] bg-navy-900 text-white p-1 px-3 rounded-xl text-xs font-medium shadow-xl whitespace-nowrap pointer-events-none animate-in fade-in duration-150"
+                    className="fixed z-[9999] bg-navy-900 text-white py-2 px-3 rounded-xl text-xs font-medium shadow-xl whitespace-nowrap pointer-events-none animate-in fade-in duration-150"
                     style={{ top: `${coords.top}px`, left: `${coords.left}px` }}
                     role="tooltip"
                 >

@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Users, Mic, Target, Trophy, ChevronDown, User, ArrowRight, Medal, Crown } from 'lucide-react';
 import { NationalStats, MantraBreakdown } from '../lib/nationalStats';
 import { UserProfile } from '../types';
-import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, getCountFromServer } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
 // ─── Animated Number ────────────────────────────────────────────────────────
@@ -84,6 +84,15 @@ const UnifiedOfferingTile: React.FC<UnifiedOfferingTileProps> = ({ globalStats, 
     const [states, setStates] = useState<LeaderboardEntry[]>([]);
     const [devotees, setDevotees] = useState<LeaderboardEntry[]>([]);
     const [isLoadingLb, setIsLoadingLb] = useState(true);
+    // Registered user count — separate from chanting participants
+    const [registeredCount, setRegisteredCount] = useState<number | null>(null);
+
+    // Fetch real registered user count once on mount
+    useEffect(() => {
+        getCountFromServer(collection(db, 'users'))
+            .then(snap => setRegisteredCount(snap.data().count))
+            .catch(() => setRegisteredCount(null));
+    }, []);
 
     // Fetch Leaderboard Logic (adapted from HomeLeaderboard.tsx)
     const fetchLeaderboardData = useCallback(async () => {
@@ -180,7 +189,7 @@ const UnifiedOfferingTile: React.FC<UnifiedOfferingTileProps> = ({ globalStats, 
                 {/* LEFT COMPONENT: National Grand Total */}
                 <div className="bg-gradient-to-br from-gold-50 via-white to-orange-50 rounded-[2rem] p-8 border-2 border-gold-100 relative overflow-hidden flex flex-col justify-center shadow-lg">
                     <div className="relative z-10 text-center">
-                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gold-600 mb-3 block">
+                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-amber-800 mb-3 block">
                             Grand Total Chants
                         </p>
                         <div className="mb-6">
@@ -209,14 +218,16 @@ const UnifiedOfferingTile: React.FC<UnifiedOfferingTileProps> = ({ globalStats, 
                         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 border-t border-navy-100">
                             <div className="flex gap-6">
                                 <div className="text-left">
-                                    <div className="flex items-center gap-1.5 mb-1 text-gold-600">
+                                    <div className="flex items-center gap-1.5 mb-1 text-amber-800">
                                         <Users size={14} />
                                         <span className="text-[9px] font-black uppercase tracking-widest">Devotees</span>
                                     </div>
-                                    <p className="text-xl font-bold text-navy-900">{globalStats?.totalParticipants.toLocaleString()}</p>
+                                    <p className="text-xl font-bold text-navy-900">
+                                        {registeredCount !== null ? registeredCount.toLocaleString() : (globalStats?.totalParticipants ?? 0).toLocaleString()}
+                                    </p>
                                 </div>
                                 <div className="text-left hidden sm:block">
-                                    <div className="flex items-center gap-1.5 mb-1 text-gold-600">
+                                    <div className="flex items-center gap-1.5 mb-1 text-amber-800">
                                         <Target size={14} />
                                         <span className="text-[9px] font-black uppercase tracking-widest">Goal</span>
                                     </div>
@@ -241,7 +252,7 @@ const UnifiedOfferingTile: React.FC<UnifiedOfferingTileProps> = ({ globalStats, 
                             <Trophy size={18} className="text-gold-500" />
                             Contribution Summary
                         </h3>
-                        <Link to="/leaderboard" className="text-[9px] font-black uppercase tracking-widest text-navy-400 hover:text-navy-900 transition-colors">
+                        <Link to="/leaderboard" className="text-[9px] font-black uppercase tracking-widest text-navy-600 hover:text-navy-900 transition-colors">
                             Full List →
                         </Link>
                     </div>
@@ -254,7 +265,7 @@ const UnifiedOfferingTile: React.FC<UnifiedOfferingTileProps> = ({ globalStats, 
                                 onClick={() => setActiveTab(tab)}
                                 className={`flex-1 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border-2 ${activeTab === tab
                                     ? 'bg-gold-50 border-gold-500 text-gold-700 shadow-sm'
-                                    : 'bg-white border-neutral-100 text-navy-400 hover:bg-navy-50 hover:border-navy-200 hover:text-navy-600'
+                                    : 'bg-white border-neutral-100 text-navy-700 hover:bg-navy-50 hover:border-navy-200 hover:text-navy-900'
                                     }`}
                             >
                                 Top {tab}

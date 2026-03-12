@@ -19,7 +19,9 @@ service cloud.firestore {
     // --- User Profiles ---
     match /users/{userId} {
       allow read: if request.auth != null && (request.auth.uid == userId || isAdmin() || resource.data.publicLeaderboard == true);
+      allow list: if isAdmin();
       allow write: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      allow create: if request.auth != null;
 
       // WordSearch game progress
       match /gameProgress/{gameId} {
@@ -30,6 +32,12 @@ service cloud.firestore {
       match /briefcase/{itemId} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
       }
+    }
+
+    // --- Rollups (leaderboard data) ---
+    match /rollups/{docId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
     }
 
     // --- Metadata / National Stats ---

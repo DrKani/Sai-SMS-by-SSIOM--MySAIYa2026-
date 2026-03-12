@@ -241,7 +241,7 @@ const ProfilePage: React.FC = () => {
             <div className="space-y-6 relative z-10">
               <div>
                 <div className="flex justify-between text-[10px] font-black uppercase tracking-widest mb-2">
-                  <span className="text-navy-300">Completion Target</span>
+                  <span className="text-white/70">Completion Target</span>
                   <span className="text-gold-500">{completions.length >= 52 ? '100%' : `${Math.floor((completions.length / 52) * 100)}% `}</span>
                 </div>
                 <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden border border-white/5 shadow-inner">
@@ -271,7 +271,7 @@ const ProfilePage: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-magenta-700 text-white p-8 rounded-bento shadow-xl relative overflow-hidden">
+          <div className="text-white p-8 rounded-bento shadow-xl relative overflow-hidden" style={{ background: '#7B2482' }}>
             <div className="absolute -bottom-4 -right-4 opacity-10"><Award size={100} /></div>
             <div className="flex justify-between items-start mb-4">
               <h3 className="text-xl font-bold uppercase tracking-tighter">Engagement Status</h3>
