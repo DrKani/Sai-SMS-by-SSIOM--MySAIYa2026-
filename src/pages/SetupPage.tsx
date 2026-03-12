@@ -225,6 +225,22 @@ const SetupPage: React.FC = () => {
                 updatedAt: serverTimestamp()
             }, { merge: true });
 
+            // 3b. Write to Member Registry (deduplicate by email)
+            try {
+                const emailStr = auth.currentUser.email || '';
+                const emailId = emailStr ? emailStr.toLowerCase().replace(/[^a-z0-9@.-]/g, '') : auth.currentUser.uid;
+                await setDoc(doc(db, 'memberRegistry', emailId), {
+                    'Name': formData.displayName,
+                    'State': finalState,
+                    'Centre affiliation': finalCentre,
+                    'Email': emailStr,
+                    'Registration Date': new Date().toISOString(),
+                    'User ID': auth.currentUser.uid
+                }, { merge: true });
+            } catch (err) {
+                console.warn("[SetupPage] Failed to write to Member Registry:", err);
+            }
+
             // 4. Update local storage cache
             localStorage.setItem('sms_user', JSON.stringify(userProfile));
 

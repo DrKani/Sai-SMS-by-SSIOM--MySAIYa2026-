@@ -56,9 +56,9 @@ const STATS_DOC_PATH = 'metadata/national_stats';
 const PARTICIPANTS_COLLECTION = 'metadata/national_stats/participants';
 const MANTRA_COUNT_COLLECTION = 'mantraCount';           // Raw transaction log
 const AGG_NATIONAL_PATH = 'aggregates/national';
-const AGG_BY_CENTRE_COLLECTION = 'aggregates/byCentre';  // doc per centre
-const AGG_BY_STATE_COLLECTION = 'aggregates/byState';    // doc per state
-const AGG_BY_USER_COLLECTION = 'aggregates/byUser';      // doc per user
+const AGG_BY_CENTRE_COLLECTION = 'aggregates_byCentre';  // doc per centre
+const AGG_BY_STATE_COLLECTION = 'aggregates_byState';    // doc per state
+const AGG_BY_USER_COLLECTION = 'aggregates_byUser';      // doc per user
 
 // ── Participant cache ─────────────────────────────────────────────────────────
 const PARTICIPANT_CACHE_KEY = 'sms_known_participant';
@@ -105,12 +105,12 @@ export const recordSadhanaOffering = async (
         // ── 1. Write raw transaction record ───────────────────────────────
         try {
             await addDoc(collection(db, MANTRA_COUNT_COLLECTION), {
-                userId: uid,
-                centre,
-                state,
-                mantraType,
-                count: chantCount,
-                date: now,
+                'User ID': uid,
+                'Centre': centre,
+                'State': state,
+                'Mantra Type': mantraType,
+                'Count': chantCount,
+                'Date': now,
             });
         } catch (e) {
             console.warn('[NationalStats] Raw record write failed:', e);
@@ -233,21 +233,21 @@ async function updateAggregates(
     // aggregates/national
     const natRef = doc(db, AGG_NATIONAL_PATH);
     const natUpdates: any = {
-        totalChants: increment(count),
-        lastUpdated: now,
+        'Total Chants': increment(count),
+        'Last Updated': now,
     };
-    if (mantraType === 'GAYATHRI') natUpdates.gayathriTotal = increment(count);
-    if (mantraType === 'SAI_GAYATHRI') natUpdates.saiGayathriTotal = increment(count);
-    if (mantraType === 'OM_SAI_RAM') natUpdates.omSaiRamTotal = increment(count);
+    if (mantraType === 'GAYATHRI') natUpdates['Gayathri Total'] = increment(count);
+    if (mantraType === 'SAI_GAYATHRI') natUpdates['Sai Gayathri Total'] = increment(count);
+    if (mantraType === 'OM_SAI_RAM') natUpdates['Om Sai Ram Total'] = increment(count);
 
     await updateDoc(natRef, natUpdates).catch(async (err) => {
         if (err.code === 'not-found') {
             await setDoc(natRef, {
-                totalChants: count,
-                gayathriTotal: mantraType === 'GAYATHRI' ? count : 0,
-                saiGayathriTotal: mantraType === 'SAI_GAYATHRI' ? count : 0,
-                omSaiRamTotal: mantraType === 'OM_SAI_RAM' ? count : 0,
-                lastUpdated: now,
+                'Total Chants': count,
+                'Gayathri Total': mantraType === 'GAYATHRI' ? count : 0,
+                'Sai Gayathri Total': mantraType === 'SAI_GAYATHRI' ? count : 0,
+                'Om Sai Ram Total': mantraType === 'OM_SAI_RAM' ? count : 0,
+                'Last Updated': now,
             });
         }
     });
@@ -256,23 +256,23 @@ async function updateAggregates(
     if (centre && centre !== 'Unknown') {
         const centreRef = doc(db, AGG_BY_CENTRE_COLLECTION, centre);
         const centreUpdates: any = {
-            saiCentre: centre,
-            totalChants: increment(count),
-            lastUpdated: now,
+            'Sai Centre': centre,
+            'Total Chants': increment(count),
+            'Last Updated': now,
         };
-        if (isMantra) centreUpdates.totalMantra = increment(count);
-        if (isOmSaiRam) centreUpdates.totalOmSaiRam = increment(count);
-        if (isNewParticipant) centreUpdates.memberCount = increment(1);
+        if (isMantra) centreUpdates['Total Chants (Mantra)'] = increment(count);
+        if (isOmSaiRam) centreUpdates['Total Om Sai Ram'] = increment(count);
+        if (isNewParticipant) centreUpdates['Member Count'] = increment(1);
 
         await updateDoc(centreRef, centreUpdates).catch(async (err) => {
             if (err.code === 'not-found') {
                 await setDoc(centreRef, {
-                    saiCentre: centre,
-                    memberCount: isNewParticipant ? 1 : 0,
-                    totalMantra: isMantra ? count : 0,
-                    totalOmSaiRam: isOmSaiRam ? count : 0,
-                    totalChants: count,
-                    lastUpdated: now,
+                    'Sai Centre': centre,
+                    'Member Count': isNewParticipant ? 1 : 0,
+                    'Total Chants (Mantra)': isMantra ? count : 0,
+                    'Total Om Sai Ram': isOmSaiRam ? count : 0,
+                    'Total Chants': count,
+                    'Last Updated': now,
                 });
             }
         });
@@ -281,21 +281,21 @@ async function updateAggregates(
     // aggregates/byState/{state}
     const stateRef = doc(db, AGG_BY_STATE_COLLECTION, state);
     const stateUpdates: any = {
-        stateRegion: state,
-        totalNamasmarana: increment(count),
-        lastUpdated: now,
+        'State / Region': state,
+        'Total Namasmarana': increment(count),
+        'Last Updated': now,
     };
-    if (isMantra) stateUpdates.totalMantra = increment(count);
-    if (isOmSaiRam) stateUpdates.omSaiRamCount = increment(count);
+    if (isMantra) stateUpdates['Total Mantra'] = increment(count);
+    if (isOmSaiRam) stateUpdates['Om Sai Ram Count'] = increment(count);
 
     await updateDoc(stateRef, stateUpdates).catch(async (err) => {
         if (err.code === 'not-found') {
             await setDoc(stateRef, {
-                stateRegion: state,
-                totalMantra: isMantra ? count : 0,
-                omSaiRamCount: isOmSaiRam ? count : 0,
-                totalNamasmarana: count,
-                lastUpdated: now,
+                'State / Region': state,
+                'Total Mantra': isMantra ? count : 0,
+                'Om Sai Ram Count': isOmSaiRam ? count : 0,
+                'Total Namasmarana': count,
+                'Last Updated': now,
             });
         }
     });
@@ -303,21 +303,22 @@ async function updateAggregates(
     // aggregates/byUser/{uid}
     const userRef = doc(db, AGG_BY_USER_COLLECTION, uid);
     const userUpdates: any = {
-        userId: uid,
-        totalChants: increment(count),
-        lastUpdated: now,
+        'User ID': uid,
+        'Total Chants': increment(count),
+        'Last Updated': now,
     };
-    if (isMantra) userUpdates.totalMantra = increment(count);
-    if (isOmSaiRam) userUpdates.totalOmSaiRam = increment(count);
+    if (isMantra) userUpdates['Total Chants (Mantra)'] = increment(count);
+    if (isOmSaiRam) userUpdates['Total Om Sai Ram'] = increment(count);
 
     await updateDoc(userRef, userUpdates).catch(async (err) => {
         if (err.code === 'not-found') {
             await setDoc(userRef, {
-                userId: uid,
-                totalMantra: isMantra ? count : 0,
-                totalOmSaiRam: isOmSaiRam ? count : 0,
-                totalChants: count,
-                lastUpdated: now,
+                'User ID': uid,
+                'Total Chants (Mantra)': isMantra ? count : 0,
+                'Total Om Sai Ram': isOmSaiRam ? count : 0,
+                'Total Chants': count,
+                'Week of completed book reading': 0, // placeholder
+                'Last Updated': now,
             });
         }
     });

@@ -176,7 +176,7 @@ const UnifiedOfferingTile: React.FC<UnifiedOfferingTileProps> = ({ globalStats, 
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-8">
                 <div className="text-center md:text-left">
-                    <h2 className="text-3xl md:text-4xl font-serif font-bold text-navy-900 mb-1">Our Collective Prayer</h2>
+                    <h2 className="text-3xl md:text-4xl font-serif font-bold text-navy-900 mb-1">Malaysia's Collective Offering</h2>
                     <p className="text-navy-500 text-sm font-medium">Offered with Love and Reverence to Bhagawan Sri Sathya Sai Baba</p>
                 </div>
                 <div className="bg-green-50 px-4 py-2 rounded-full border border-green-100 flex items-center gap-2 shadow-inner">
